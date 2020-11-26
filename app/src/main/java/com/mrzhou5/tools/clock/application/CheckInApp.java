@@ -21,6 +21,7 @@ import com.mrzhou5.tools.clock.util.MsgUtil;
 import com.mrzhou5.tools.clock.util.StringUtil;
 
 import java.util.Calendar;
+import java.util.Date;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -35,43 +36,49 @@ public class CheckInApp extends Application {
     private int amHH = 7;
     private int amMM = 45;
     private int pmHH = 18;
-    private int pmMM = 27;
+    private int pmMM = 45;
     /**
      * 是否需要保持APP前台显示，若值设置为true则保持前台显示，否则不保持前台显示
      * 默认保持前台显示
      */
     private static final AtomicBoolean keepAppFront = new AtomicBoolean(true);
 
-    private final BroadcastReceiver timeReciver = new BroadcastReceiver() {
+    private final BroadcastReceiver reciver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
             String action = intent.getAction();
-            if (action.equals(Intent.ACTION_TIME_TICK)) {
-                Calendar calendar = Calendar.getInstance();
-                int month = calendar.get(Calendar.MONTH)+1;
-                int day = calendar.get(Calendar.DAY_OF_MONTH);
-                int hour = calendar.get(Calendar.HOUR_OF_DAY);
-                int minute = calendar.get(Calendar.MINUTE);
-                if (lastDay != day) {
-                    lastDay = day;
-//                    random = new Random().nextInt(20) - 10;
-                    amMM = amMM + random;
-//                    random = new Random().nextInt(20) - 10;
-                    pmMM = pmMM + random;
-                    String msg = month + "月" + day + "日打卡时间：上班卡-" + amHH + ":" + amMM + "，下班卡-" + pmHH + ":" + pmMM;
-                    Log.d(TAG, msg);
-                    MsgUtil.send("打卡准备",msg);
-                }
-                if (hour == amHH || hour == pmHH) {
-                    if (minute >= amMM || minute >= pmMM) {
-                        CheckInApp.setKeepAppFront(false);
-                        return;
-                    }
-                }
-                CheckInApp.setKeepAppFront(true);
+            switch (action) {
+                case Intent.ACTION_TIME_TICK:daka();break;
+                case Intent.ACTION_SCREEN_OFF:MsgUtil.send("锁屏",new Date().toLocaleString());break;
             }
         }
     };
+
+    public void daka() {
+        Calendar calendar = Calendar.getInstance();
+        int month = calendar.get(Calendar.MONTH)+1;
+        int day = calendar.get(Calendar.DAY_OF_MONTH);
+        int hour = calendar.get(Calendar.HOUR_OF_DAY);
+        int minute = calendar.get(Calendar.MINUTE);
+        if (lastDay != day) {
+            lastDay = day;
+            random = new Random().nextInt(20) - 10;
+            amMM = amMM + random;
+            random = new Random().nextInt(20) - 10;
+            pmMM = pmMM + random;
+            String msg = month + "月" + day + "日打卡时间：上班卡-" + amHH + ":" + amMM + "，下班卡-" + pmHH + ":" + pmMM;
+            Log.d(TAG, msg);
+            MsgUtil.send("打卡准备",msg);
+        }
+        if (hour == amHH || hour == pmHH) {
+            if (minute >= amMM || minute >= pmMM) {
+                MsgUtil.send("开始打卡:"+hour+"-"+minute, "");
+                CheckInApp.setKeepAppFront(false);
+                return;
+            }
+        }
+        CheckInApp.setKeepAppFront(true);
+    }
 
     @Override
     public void onCreate() {
@@ -102,7 +109,9 @@ public class CheckInApp extends Application {
             }
             IntentFilter filter = new IntentFilter();
             filter.addAction(Intent.ACTION_TIME_TICK);
-            registerReceiver(timeReciver, filter);
+            registerReceiver(reciver, filter);
+            filter.addAction(Intent.ACTION_SCREEN_OFF);
+            registerReceiver(reciver, filter);
         }
     }
 
