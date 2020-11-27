@@ -79,7 +79,7 @@ public class RemoteServantService extends Service {
     @Override
     public void onDestroy() {
         super.onDestroy();
-        Toast.makeText(this, "this Remote service destroy", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, "远程保活服务关闭", Toast.LENGTH_SHORT).show();
         stopForeground(false);
         unbindService(connection);
     }
@@ -87,11 +87,11 @@ public class RemoteServantService extends Service {
     private void createNotificationChannel() {
         NotificationManager mNotificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
         // 通知渠道的id
-        String id = "my_channel_01";
+        String id = "my_channel_02";
         // 用户可以看到的通知渠道的名字.
-        CharSequence name = getString(R.string.channel_name);
+        CharSequence name = getString(R.string.channel_name2);
 //         用户可以看到的通知渠道的描述
-        String description = getString(R.string.channel_description);
+        String description = getString(R.string.channel_description2);
         int importance = NotificationManager.IMPORTANCE_HIGH;
         NotificationChannel mChannel = new NotificationChannel(id, name, importance);
 //         配置通知渠道的属性
@@ -106,16 +106,15 @@ public class RemoteServantService extends Service {
         mNotificationManager.createNotificationChannel(mChannel);
 
         // 为该通知设置一个id
-        int notifyID = 1;
+        int notifyID = 2;
         // 通知渠道的id
-        String CHANNEL_ID = "my_channel_01";
         // Create a notification and set the notification channel.
         Notification notification = new Notification.Builder(this)
-                .setContentTitle("钉钉").setContentText("打卡服务正在后台运行")
+                .setContentTitle("时钟服务").setContentText("Remote服务正在后台运行")
                 .setSmallIcon(R.mipmap.ic_launcher_foreground)
-                .setChannelId(CHANNEL_ID)
+                .setChannelId(id)
                 .build();
-        startForeground(1, notification);
+        startForeground(notifyID, notification);
     }
 
     private class MyBinder extends IMyAidlInterface.Stub {

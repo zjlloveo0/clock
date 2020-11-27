@@ -42,42 +42,55 @@ public class CheckInApp extends Application {
      * 默认保持前台显示
      */
     private static final AtomicBoolean keepAppFront = new AtomicBoolean(true);
+    private static final AtomicBoolean isMaintence = new AtomicBoolean(false);
 
     private final BroadcastReceiver reciver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
             String action = intent.getAction();
             switch (action) {
-                case Intent.ACTION_TIME_TICK:daka();break;
-                case Intent.ACTION_SCREEN_OFF:MsgUtil.send("锁屏",new Date().toLocaleString());break;
+                case Intent.ACTION_TIME_TICK:
+                    daka();
+                    break;
+                case Intent.ACTION_SCREEN_OFF:
+                    MsgUtil.send("锁屏", new Date().toLocaleString());
+                    break;
             }
         }
     };
 
     public void daka() {
         Calendar calendar = Calendar.getInstance();
-        int month = calendar.get(Calendar.MONTH)+1;
+        int month = calendar.get(Calendar.MONTH) + 1;
         int day = calendar.get(Calendar.DAY_OF_MONTH);
         int hour = calendar.get(Calendar.HOUR_OF_DAY);
         int minute = calendar.get(Calendar.MINUTE);
+        String msg = month + "月" + day + "日打卡时间：上班卡-" + amHH + ":" + amMM + "，下班卡-" + pmHH + ":" + pmMM;
         if (lastDay != day) {
-            lastDay = day;
             random = new Random().nextInt(20) - 10;
             amMM = amMM + random;
             random = new Random().nextInt(20) - 10;
             pmMM = pmMM + random;
-            String msg = month + "月" + day + "日打卡时间：上班卡-" + amHH + ":" + amMM + "，下班卡-" + pmHH + ":" + pmMM;
             Log.d(TAG, msg);
-            MsgUtil.send("打卡准备",msg);
-        }
-        if (hour == amHH || hour == pmHH) {
-            if (minute >= amMM || minute >= pmMM) {
-                MsgUtil.send("开始打卡:"+hour+"-"+minute, "");
-                CheckInApp.setKeepAppFront(false);
-                return;
+            if (lastDay == 0) {
+                MsgUtil.send("打卡准备", msg);
             }
+            lastDay = day;
         }
-        CheckInApp.setKeepAppFront(true);
+        if ((hour == 7 && minute == 0) || (hour == 18 && minute == 0)) {
+            MsgUtil.send("打卡准备", msg);
+        }
+        if ((hour == amHH && minute >= amMM) || (hour == pmHH && minute >= pmMM)) {
+            if (CheckInApp.getKeepAppFront()) {
+                MsgUtil.send("开始打卡:" + hour + "-" + minute, "");
+            }
+            CheckInApp.setIsMaintence(false);
+            CheckInApp.setKeepAppFront(false);
+            return;
+        }
+        if ((hour == 8 && minute == 30) || (hour == 21 && minute == 0)) {
+            CheckInApp.setKeepAppFront(true);
+        }
     }
 
     @Override
@@ -191,8 +204,15 @@ public class CheckInApp extends Application {
         return keepAppFront.get();
     }
 
-    public static void setKeepAppFront(boolean keepAppFront) {
-        CheckInApp.keepAppFront.set(keepAppFront);
+    public static void setKeepAppFront(boolean isMaintence) {
+        CheckInApp.keepAppFront.set(isMaintence);
+    }
+    public static boolean getIsMaintence() {
+        return isMaintence.get();
+    }
+
+    public static void setIsMaintence(boolean isMaintence) {
+        CheckInApp.isMaintence.set(isMaintence);
     }
 
     public static Typeface getOtfPingfangSimpleRoutine() {

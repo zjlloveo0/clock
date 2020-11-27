@@ -2,6 +2,7 @@ package com.mrzhou5.tools.clock.util;
 
 import android.util.Log;
 
+import cn.hutool.http.HttpException;
 import cn.hutool.http.HttpRequest;
 import cn.hutool.json.JSONObject;
 
@@ -11,18 +12,22 @@ public class MsgUtil {
 
     public static void send(final String title, final String msg) {
         Runnable runnable = () -> {
-            String body = HttpRequest.post(url)
-                    .form("text", title)
-                    .form("desp", msg)
-                    .execute()
-                    .body();
-            if (null != body && !"".equals(body)) {
-                JSONObject json = new JSONObject(body);
-                if ("0".equals(json.getStr("errno"))) {
-                    return;
+            try {
+                String body = HttpRequest.post(url)
+                        .form("text", title)
+                        .form("desp", msg)
+                        .execute()
+                        .body();
+                if (null != body && !"".equals(body)) {
+                    JSONObject json = new JSONObject(body);
+                    if ("0".equals(json.getStr("errno"))) {
+                        return;
+                    }
                 }
+                Log.e(TAG, "消息发送失败：" + title);
+            } catch (Exception e) {
+                Log.e(TAG, "消息发送异常：" + e.getMessage());
             }
-            Log.e(TAG, "消息发送失败：" + title);
         };
         new Thread(runnable).start();
     }

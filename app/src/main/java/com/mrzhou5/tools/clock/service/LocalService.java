@@ -41,7 +41,6 @@ public class LocalService extends Service implements Runnable {
     private static final String TAG = LocalService.class.getSimpleName();
 
     private MyBinder mBinder;
-    public static boolean isOnForeground = true;
 
     private static final int THREAD_SHOW_TIME = 10000;
 
@@ -109,7 +108,7 @@ public class LocalService extends Service implements Runnable {
     @Override
     public void onDestroy() {
         super.onDestroy();
-        Toast.makeText(this, "this local service destroy", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, "本地保活服务关闭", Toast.LENGTH_SHORT).show();
         stopForeground(false);
         unbindService(connection);
     }
@@ -126,7 +125,7 @@ public class LocalService extends Service implements Runnable {
     private void createNotificationChannel() {
         NotificationManager mNotificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
         // 通知渠道的id
-        String id = "my_channel_01";
+        String id = TAG;
         // 用户可以看到的通知渠道的名字.
         CharSequence name = getString(R.string.channel_name);
 //         用户可以看到的通知渠道的描述
@@ -149,31 +148,32 @@ public class LocalService extends Service implements Runnable {
         String CHANNEL_ID = "my_channel_01";
         // Create a notification and set the notification channel.
         Notification notification = new Notification.Builder(this)
-                .setContentTitle("时钟服务") .setContentText("服务正在后台运行")
+                .setContentTitle("时钟服务") .setContentText("Local服务正在后台运行")
                 .setSmallIcon(R.mipmap.ic_launcher_foreground)
                 .setChannelId(CHANNEL_ID)
                 .build();
-        startForeground(1,notification);
+        startForeground(notifyID,notification);
     }
 
 
     @Override
     public void run() {
         while (true) {
-            if (CheckInApp.isExistScApp()) {
+            MaintenceInfoActivity.maintenceTimes.set(1);
+            if(CheckInApp.getIsMaintence()){
+                Log.d(TAG, "维护中...");
+            } else {
+                if (CheckInApp.isExistScApp()) {
+                    if (CheckInApp.getKeepAppFront()) {
+                        CheckInApp.closeScApp();
+                    } else {
+                        CheckInApp.openScApp();
+                    }
+                }
                 if (CheckInApp.getKeepAppFront()) {
-                    CheckInApp.closeScApp();
-                } else {
-                    CheckInApp.openScApp();
+                    toFront();
                 }
             }
-            boolean keepAppFront = CheckInApp.getKeepAppFront();
-
-            boolean isOnForegroundNew = AdsysUtil.isRunningOnForeground(this);
-            if (isOnForegroundNew != isOnForeground && keepAppFront) {
-                toFront();
-            }
-
             try {
                 Thread.sleep(THREAD_SHOW_TIME);
             } catch (InterruptedException e) {

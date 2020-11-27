@@ -1,18 +1,24 @@
 package com.mrzhou5.tools.clock.activity;
 
+import android.graphics.Color;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.mrzhou5.tools.clock.R;
 import com.mrzhou5.tools.clock.application.CheckInApp;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class MaintenceInfoActivity extends BaseActivity {
+    private final static String TAG = MaintenceInfoActivity.class.getSimpleName();
     TextView timeStr;
+    public final static AtomicInteger maintenceTimes = new AtomicInteger(1);
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -21,8 +27,20 @@ public class MaintenceInfoActivity extends BaseActivity {
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         timeStr = findViewById(R.id.timeStr);
         timeStr.setTypeface(CheckInApp.getOtfPingfangSimpleRoutine());
+        timeStr.setOnClickListener(v -> {
+            Log.d(TAG, "maintenceTimes: " + maintenceTimes);
+            if (maintenceTimes.getAndAdd(1) >= 5) {
+                maintenceTimes.set(1);
+                CheckInApp.setIsMaintence(!CheckInApp.getIsMaintence());
+                if(CheckInApp.getIsMaintence()){
+                    timeStr.setTextColor(Color.GREEN);
+                }else {
+                    timeStr.setTextColor(Color.WHITE);
+                }
+            }
+        });
         setSystemUIVisible(!CheckInApp.getKeepAppFront());
-        new Thread(()-> {
+        new Thread(() -> {
             try {
                 while (true) {
                     Date date = new Date();
