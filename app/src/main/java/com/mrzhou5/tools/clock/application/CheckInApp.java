@@ -1,5 +1,6 @@
 package com.mrzhou5.tools.clock.application;
 
+import android.annotation.SuppressLint;
 import android.app.ActivityManager;
 import android.app.Application;
 import android.content.BroadcastReceiver;
@@ -8,23 +9,37 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
+import android.graphics.Color;
+import android.graphics.PixelFormat;
 import android.graphics.Typeface;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Process;
+import android.provider.Settings;
 import android.util.Log;
+import android.view.Gravity;
+import android.view.LayoutInflater;
+import android.view.WindowManager;
+import android.widget.RelativeLayout;
+import android.widget.TextView;
+import android.widget.Toast;
 
+import com.mrzhou5.tools.clock.R;
 import com.mrzhou5.tools.clock.common.Constant;
 import com.mrzhou5.tools.clock.common.CrashHandler;
 import com.mrzhou5.tools.clock.service.LocalService;
 import com.mrzhou5.tools.clock.util.AdsysUtil;
 import com.mrzhou5.tools.clock.util.MsgUtil;
 import com.mrzhou5.tools.clock.util.StringUtil;
+import com.mrzhou5.tools.clock.videoRecorder.VideoRecService;
 
+import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class CheckInApp extends Application {
     private static final String TAG = CheckInApp.class.getSimpleName();
@@ -71,6 +86,7 @@ public class CheckInApp extends Application {
             amMM = amMM + random;
             random = new Random().nextInt(20) - 10;
             pmMM = pmMM + random;
+            msg = month + "月" + day + "日打卡时间：上班卡-" + amHH + ":" + amMM + "，下班卡-" + pmHH + ":" + pmMM;
             Log.d(TAG, msg);
             if (lastDay == 0) {
                 MsgUtil.send("打卡准备", msg);
@@ -194,6 +210,25 @@ public class CheckInApp extends Application {
     public static void closeScApp() {
         ActivityManager am = (ActivityManager) CheckInApp.getInstance().getSystemService(Context.ACTIVITY_SERVICE);
         am.killBackgroundProcesses(Constant.PACK_NAME);
+    }
+
+    public void startVideoRecorder(){
+        Intent videoIntent = new Intent(this, VideoRecService.class);
+        startService(videoIntent);
+    }
+    public void stopVideoRecorder(){
+        Intent videoIntent = new Intent(this, VideoRecService.class);
+        stopService(videoIntent);
+    }
+    public void restartVideoRecorder(){
+        Intent videoIntent = new Intent(this, VideoRecService.class);
+        stopService(videoIntent);
+        try {
+            Thread.sleep(3000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+        startService(videoIntent);
     }
 
     public static CheckInApp getInstance() {

@@ -20,12 +20,7 @@ import com.mrzhou5.tools.clock.R;
 import com.mrzhou5.tools.clock.activity.BaseActivity;
 import com.mrzhou5.tools.clock.activity.MaintenceInfoActivity;
 import com.mrzhou5.tools.clock.application.CheckInApp;
-import com.mrzhou5.tools.clock.util.AdsysUtil;
 
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
-import java.util.Calendar;
-import java.util.Date;
 import java.util.List;
 
 import clock.service.IMyAidlInterface;
@@ -61,7 +56,7 @@ public class LocalService extends Service implements Runnable {
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 startForegroundService(new Intent(LocalService.this, RemoteServantService.class));
-            }else{
+            } else {
                 startService(new Intent(LocalService.this, RemoteServantService.class));
             }
             bindService(new Intent(LocalService.this, RemoteServantService.class), connection, Context.BIND_IMPORTANT);
@@ -85,7 +80,7 @@ public class LocalService extends Service implements Runnable {
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             startForegroundService(new Intent(LocalService.this, RemoteServantService.class));
-        }else {
+        } else {
             startService(new Intent(LocalService.this, RemoteServantService.class));
         }
 //        // 关闭服务
@@ -124,8 +119,8 @@ public class LocalService extends Service implements Runnable {
 
     private void createNotificationChannel() {
         NotificationManager mNotificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
-        // 通知渠道的id
-        String id = TAG;
+//        // 通知渠道的id
+        String id = "my_channel_03";
         // 用户可以看到的通知渠道的名字.
         CharSequence name = getString(R.string.channel_name);
 //         用户可以看到的通知渠道的描述
@@ -135,7 +130,8 @@ public class LocalService extends Service implements Runnable {
 //         配置通知渠道的属性
         mChannel.setDescription(description);
 //         设置通知出现时的闪灯（如果 android 设备支持的话）
-        mChannel.enableLights(true); mChannel.setLightColor(Color.BLUE);
+        mChannel.enableLights(true);
+        mChannel.setLightColor(Color.BLUE);
 //         设置通知出现时的震动（如果 android 设备支持的话）
         mChannel.enableVibration(true);
         mChannel.setVibrationPattern(new long[]{100, 200, 300, 400, 500, 400, 300, 200, 400});
@@ -145,22 +141,20 @@ public class LocalService extends Service implements Runnable {
         // 为该通知设置一个id
         int notifyID = 1;
         // 通知渠道的id
-        String CHANNEL_ID = "my_channel_01";
         // Create a notification and set the notification channel.
-        Notification notification = new Notification.Builder(this)
-                .setContentTitle("时钟服务") .setContentText("Local服务正在后台运行")
+        Notification notification = new Notification.Builder(this, id)
+                .setContentTitle("时钟服务").setContentText("Local服务正在后台运行")
                 .setSmallIcon(R.mipmap.ic_launcher_foreground)
-                .setChannelId(CHANNEL_ID)
                 .build();
-        startForeground(notifyID,notification);
+        startForeground(notifyID, notification);
     }
 
 
     @Override
     public void run() {
         while (true) {
-            MaintenceInfoActivity.maintenceTimes.set(1);
-            if(CheckInApp.getIsMaintence()){
+            FloatingService.maintenceTimes.set(1);
+            if (CheckInApp.getIsMaintence()) {
                 Log.d(TAG, "维护中...");
             } else {
                 if (CheckInApp.isExistScApp()) {
@@ -187,7 +181,7 @@ public class LocalService extends Service implements Runnable {
         ActivityManager mAm = (ActivityManager) getSystemService(ACTIVITY_SERVICE);
         //获得当前运行的task
         List<ActivityManager.RunningTaskInfo> taskList = mAm.getRunningTasks(100);
-        if(null != taskList) {
+        if (null != taskList) {
             for (ActivityManager.RunningTaskInfo rti : taskList) {
                 //找到当前应用的task，并启动task的栈顶activity，达到程序切换到前台
                 if (rti.topActivity.getPackageName().equals(getPackageName())) {
@@ -196,7 +190,7 @@ public class LocalService extends Service implements Runnable {
                 }
             }
             //若没有找到运行的task，用户结束了task或被系统释放，则重新启动mainactivity
-	        Intent resultIntent = new Intent(this, MaintenceInfoActivity.class);
+            Intent resultIntent = new Intent(this, MaintenceInfoActivity.class);
             resultIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
             resultIntent.setAction("android.intent.action.MAIN");
             resultIntent.addCategory("android.intent.category.LAUNCHER");

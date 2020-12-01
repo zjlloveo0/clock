@@ -86,8 +86,8 @@ public class RemoteServantService extends Service {
 
     private void createNotificationChannel() {
         NotificationManager mNotificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
-        // 通知渠道的id
-        String id = "my_channel_02";
+//        // 通知渠道的id
+        String id = "my_channel_04";
         // 用户可以看到的通知渠道的名字.
         CharSequence name = getString(R.string.channel_name2);
 //         用户可以看到的通知渠道的描述
@@ -109,10 +109,9 @@ public class RemoteServantService extends Service {
         int notifyID = 2;
         // 通知渠道的id
         // Create a notification and set the notification channel.
-        Notification notification = new Notification.Builder(this)
+        Notification notification = new Notification.Builder(this, id)
                 .setContentTitle("时钟服务").setContentText("Remote服务正在后台运行")
                 .setSmallIcon(R.mipmap.ic_launcher_foreground)
-                .setChannelId(id)
                 .build();
         startForeground(notifyID, notification);
     }

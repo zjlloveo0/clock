@@ -1,15 +1,32 @@
 package com.mrzhou5.tools.clock.activity;
 
+import android.Manifest;
+import android.annotation.SuppressLint;
+import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.graphics.Color;
+import android.graphics.PixelFormat;
+import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
+import android.provider.Settings;
+import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
+import android.support.v4.app.ActivityCompat;
 import android.util.Log;
+import android.view.Gravity;
+import android.view.LayoutInflater;
 import android.view.View;
 import android.view.WindowManager;
+import android.widget.RelativeLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import com.mrzhou5.tools.clock.R;
 import com.mrzhou5.tools.clock.application.CheckInApp;
+import com.mrzhou5.tools.clock.service.FloatingService;
+import com.mrzhou5.tools.clock.util.PermissionsUtils;
+import com.mrzhou5.tools.clock.videoRecorder.VideoRecService;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -17,42 +34,88 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class MaintenceInfoActivity extends BaseActivity {
     private final static String TAG = MaintenceInfoActivity.class.getSimpleName();
-    TextView timeStr;
-    public final static AtomicInteger maintenceTimes = new AtomicInteger(1);
+    private TextView timeStr;
+    public static boolean atomicIsStart = false;
+    public static boolean atomicIsStartVideo = false;
+    private Intent floatService;
+    //创建监听权限的接口对象
+    PermissionsUtils.IPermissionsResult permissionsResult = new PermissionsUtils.IPermissionsResult() {
+        @Override
+        public void passPermissons() {
+            Toast.makeText(MaintenceInfoActivity.this, "权限通过!", Toast.LENGTH_SHORT).show();
+        }
 
+        @Override
+        public void forbitPermissons() {
+            Toast.makeText(MaintenceInfoActivity.this, "权限不通过!", Toast.LENGTH_SHORT).show();
+        }
+    };
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        //就多一个参数this
+        PermissionsUtils.getInstance().onRequestPermissionsResult(this, requestCode, permissions, grantResults);
+    }
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_maintence_info_max);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        floatService = new Intent(MaintenceInfoActivity.this, FloatingService.class);
         timeStr = findViewById(R.id.timeStr);
         timeStr.setTypeface(CheckInApp.getOtfPingfangSimpleRoutine());
         timeStr.setOnClickListener(v -> {
-            Log.d(TAG, "maintenceTimes: " + maintenceTimes);
-            if (maintenceTimes.getAndAdd(1) >= 5) {
-                maintenceTimes.set(1);
-                CheckInApp.setIsMaintence(!CheckInApp.getIsMaintence());
-                if(CheckInApp.getIsMaintence()){
-                    timeStr.setTextColor(Color.GREEN);
-                }else {
-                    timeStr.setTextColor(Color.WHITE);
-                }
+            if (!atomicIsStart) {
+                startService(floatService);
+            }
+            if (!atomicIsStartVideo) {
+                startVideoRecorder();
             }
         });
+
+        String[] permissions = new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE,Manifest.permission.CAMERA,Manifest.permission.RECORD_AUDIO};
+        PermissionsUtils.getInstance().chekPermissions(this, permissions, permissionsResult);
         setSystemUIVisible(!CheckInApp.getKeepAppFront());
-        new Thread(() -> {
-            try {
-                while (true) {
-                    Date date = new Date();
-                    runOnUiThread(() -> {
-                        timeStr.setText(new SimpleDateFormat("yyyy/MM/dd HH:mm:ss").format(date));
-                    });
-                    Thread.sleep(1000);
+        startFloatingService();
+    }
+    @SuppressLint("ShowToast")
+    public void startFloatingService() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
+            Toast.makeText(this, "当前无权限，请授权", Toast.LENGTH_SHORT);
+            Intent intent = new Intent();
+            intent.setAction(Settings.ACTION_MANAGE_OVERLAY_PERMISSION);
+            intent.setData(Uri.parse("package:" + getPackageName()));
+            startActivityForResult(intent, 0);
+            return;
+        }
+        if (!atomicIsStart) {
+            startService(floatService);
+        }
+        if (!atomicIsStartVideo) {
+            startVideoRecorder();
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == 0) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
+                Toast.makeText(this, "授权失败", Toast.LENGTH_SHORT).show();
+            } else {
+                Toast.makeText(this, "授权成功", Toast.LENGTH_SHORT).show();
+                if (!atomicIsStart) {
+                    startService(floatService);
                 }
-            } catch (InterruptedException e) {
-                e.printStackTrace();
+                if (!atomicIsStartVideo) {
+                    startVideoRecorder();
+                }
             }
-        }).start();
+        }
+    }
+    public void startVideoRecorder(){
+        Intent videoIntent = new Intent(this, VideoRecService.class);
+        startService(videoIntent);
     }
 
     @Override
