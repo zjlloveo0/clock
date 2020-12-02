@@ -212,25 +212,6 @@ public class CheckInApp extends Application {
         am.killBackgroundProcesses(Constant.PACK_NAME);
     }
 
-    public void startVideoRecorder(){
-        Intent videoIntent = new Intent(this, VideoRecService.class);
-        startService(videoIntent);
-    }
-    public void stopVideoRecorder(){
-        Intent videoIntent = new Intent(this, VideoRecService.class);
-        stopService(videoIntent);
-    }
-    public void restartVideoRecorder(){
-        Intent videoIntent = new Intent(this, VideoRecService.class);
-        stopService(videoIntent);
-        try {
-            Thread.sleep(3000);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
-        startService(videoIntent);
-    }
-
     public static CheckInApp getInstance() {
         return instance;
     }

@@ -37,6 +37,7 @@ public class MaintenceInfoActivity extends BaseActivity {
     private TextView timeStr;
     public static boolean atomicIsStart = false;
     public static boolean atomicIsStartVideo = false;
+    private static MaintenceInfoActivity instance = null;
     private Intent floatService;
     //创建监听权限的接口对象
     PermissionsUtils.IPermissionsResult permissionsResult = new PermissionsUtils.IPermissionsResult() {
@@ -77,6 +78,7 @@ public class MaintenceInfoActivity extends BaseActivity {
         PermissionsUtils.getInstance().chekPermissions(this, permissions, permissionsResult);
         setSystemUIVisible(!CheckInApp.getKeepAppFront());
         startFloatingService();
+        instance = this;
     }
     @SuppressLint("ShowToast")
     public void startFloatingService() {
@@ -138,5 +140,9 @@ public class MaintenceInfoActivity extends BaseActivity {
             uiFlags |= 0x00001000;
             getWindow().getDecorView().setSystemUiVisibility(uiFlags);
         }
+    }
+
+    public static MaintenceInfoActivity getInstance() {
+        return instance;
     }
 }

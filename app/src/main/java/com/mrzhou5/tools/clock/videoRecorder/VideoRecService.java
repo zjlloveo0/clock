@@ -31,11 +31,10 @@ import android.widget.RelativeLayout;
 import com.mrzhou5.tools.clock.R;
 import com.mrzhou5.tools.clock.activity.MaintenceInfoActivity;
 import com.mrzhou5.tools.clock.application.CheckInApp;
+import com.mrzhou5.tools.clock.receiver.ServiceReceiver;
 import com.mrzhou5.tools.clock.util.FileUtil;
 
-import java.io.BufferedReader;
 import java.io.File;
-import java.io.InputStreamReader;
 import java.text.SimpleDateFormat;
 import java.util.Arrays;
 import java.util.Calendar;
@@ -48,8 +47,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-
-import cn.hutool.json.JSONUtil;
 
 /**
  * 静默录像
@@ -89,44 +86,22 @@ public class VideoRecService extends Service implements View.OnClickListener
         recorder();
         return true;
     };
+    private ServiceReceiver serviceReceiver;
 
-    Comparator<File> dateDirComparator = (o1, o2) -> {
-        long o1Name = 0;
-        try {
-            o1Name = Long.parseLong(o1.getName().replace(".mp4", ""));
-        } catch (NumberFormatException e) {
-            Log.e(TAG, "Arrays.sort:" + e.getMessage());
-            return -1;
-        }
-        long o2Name = 0;
-        try {
-            o2Name = Long.parseLong(o2.getName().replace(".mp4", ""));
-        } catch (NumberFormatException e) {
-            Log.e(TAG, "Arrays.sort:" + e.getMessage());
-            return 1;
-        }
-        if (o1Name < o2Name) {
-            return -1;
-        } else if (o1Name == o2Name) {
-            return 0;
-        } else {
-            return 1;
-        }
-    };
     private BroadcastReceiver mTimeReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
             Future<Boolean> future = executor.submit(startWork);
+            boolean isException = false;
             try {
                 future.get(8, TimeUnit.SECONDS);
-            } catch (TimeoutException e) {
-                Log.e(TAG, "onReceive: 执行超时");
-                future.cancel(true);
-//                executor.shutdownNow();
-                freeCameraResource();
-                restartVideoRecoder(true);
             } catch (Exception e) {
+                isException = true;
                 Log.e(TAG, "stop: " + e.getMessage());
+            } finally {
+                if (isException) {
+                    restart();
+                }
             }
         }
     };
@@ -137,71 +112,43 @@ public class VideoRecService extends Service implements View.OnClickListener
         instance = this;
         Log.i(TAG, "onCreat");
         MaintenceInfoActivity.atomicIsStartVideo = true;
+        serviceReceiver = new ServiceReceiver();
+        IntentFilter filter = new IntentFilter();
+        filter.addAction("RESTART_SERVICE");
+        registerReceiver(serviceReceiver, filter);
         // 创建悬浮窗
         createFloatView();
         initView();
         // 录像
         new Thread(() -> {
+            boolean isException = false;
             try {
                 Thread.sleep(3000);
                 startRecord();
-            } catch (InterruptedException e) {
-                e.printStackTrace();
+            } catch (Exception e) {
+                isException = true;
+                Log.e(TAG, "onCreate: " + e.getMessage());
             } finally {
-                // 启动分钟监听器 整分时收到广播
-                IntentFilter timeFilter = new IntentFilter();
-                timeFilter.addAction(Intent.ACTION_TIME_TICK);
-                registerReceiver(mTimeReceiver, timeFilter);
-                isRegister = true;
+                if (!isException) {
+                    // 启动分钟监听器 整分时收到广播
+                    IntentFilter timeFilter = new IntentFilter();
+                    timeFilter.addAction(Intent.ACTION_TIME_TICK);
+                    registerReceiver(mTimeReceiver, timeFilter);
+                    isRegister = true;
+                }
             }
         }).start();
     }
 
     /**
-     * 录像控制方法
-     * 整点时停止并重新开启录像（切换文件）
-     * 异常状态（摄像头断连、存储设备断连）
-     */
-    public void recorder() {
-        Calendar cal = Calendar.getInstance();
-        int hour = cal.get(Calendar.HOUR_OF_DAY);
-        int min = cal.get(Calendar.MINUTE);
-        try {
-            if (0 == min % 1) {
-                // 整点切换文件
-                stopRecord();
-                if (hour > 20 || hour < 7) {
-                    Log.d(TAG, "recorder: 非录像时段");
-                    return;
-                }
-                if (CheckInApp.getIsMaintence()) {
-                    Log.d(TAG, "维护中暂不录像");
-                    return;
-                }
-                startRecord();
-            } else if (!isRecording) {
-                // 未启动需要启动
-                Log.d(TAG, "recorder: 检测代码");
-                startRecord();
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "BroadcastReceiver:" + e.getMessage());
-        }
-    }
-
-    /**
      * 开始录制视频
      */
-    public void startRecord() {
+    public void startRecord() throws Exception {
         if (!isRecording) {
-            try {
-                Log.d(TAG, "开始录像");
-                isRecording = true;
-                createRecordDir();
-                initRecord();
-            } catch (Exception e) {
-                Log.e(TAG, "startRecord:" + e.getMessage());
-            }
+            Log.d(TAG, "开始录像");
+            isRecording = true;
+            createRecordDir();
+            initRecord();
         }
     }
 
@@ -212,148 +159,233 @@ public class VideoRecService extends Service implements View.OnClickListener
         if (isRecording) {
             isRecording = false;
             Log.d(TAG, "停止录像");
-            if (mMediaRecorder != null) {
-                try {
-                    mMediaRecorder.stop();
-                    mMediaRecorder.reset();
-                } catch (Exception e) {
-                    Log.e(TAG, "stopRecord:" + e.getMessage());
-                }
-            }
-        }
-    }
-
-    private void restartVideoRecoder(boolean isRestartService) {
-        if (isRestartService) {
-            Log.d(TAG, "restartVideoRecoderService");
-            CheckInApp.getInstance().restartVideoRecorder();
+            mMediaRecorder.stop();
+            mMediaRecorder.reset();
         }
     }
 
     @Override
     public void onDestroy() {
-        Log.d(TAG, "onDestroy");
-        MaintenceInfoActivity.atomicIsStartVideo = false;
-        stop();
-        mWindowManager.removeView(mFloatLayout);
-        mMediaRecorder = null;
-        mWindowManager = null;
-        mSurfaceView = null;
-        mSurfaceHolder = null;
-        mCamera = null;
-        isRecording = false;
-        if (isRegister) {
-            unregisterReceiver(mTimeReceiver);
-            isRegister = false;
-        }
         super.onDestroy();
+        Log.d(TAG, "onDestroy");
+//        try {
+//            Future<Boolean> future = executor.submit(workStop);
+//            future.get(1, TimeUnit.SECONDS);
+//        } catch (TimeoutException e) {
+//            Log.e(TAG, "stop: 执行超时");
+//        } catch (Exception e) {
+//            Log.e(TAG, "stop: " + e.getMessage());
+//        }
+        try {
+            stopRecord();
+            freeCameraResource();
+            releaseRecord();
+            mWindowManager.removeView(mFloatLayout);
+            if (isRegister) {
+                unregisterReceiver(mTimeReceiver);
+                unregisterReceiver(serviceReceiver);
+                isRegister = false;
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "onDestroy: " + e.getMessage());
+        }
+    }
+
+    private void restart() {
+        MaintenceInfoActivity.atomicIsStartVideo = false;
+        Intent intent = new Intent("RESTART_SERVICE");
+        sendBroadcast(intent);
     }
 
     Callable<Boolean> workStop = () -> {
-        freeCameraResource();
         stopRecord();
+        freeCameraResource();
         releaseRecord();
         return true;
     };
 
+
+    private void initView() {
+        mSurfaceHolder = mSurfaceView.getHolder();// 取得holder
+        mSurfaceHolder.removeCallback(this);
+        mSurfaceHolder.addCallback(this); // holder加入回调接口
+        mSurfaceHolder.setKeepScreenOn(true);
+    }
+
     /**
-     * 停止拍摄
-     * 如果后续还要录像，就不要调用此方法
+     * 录制前，初始化
      */
-    public void stop() {
-        Log.d(TAG, "start stop");
-        try {
-            Future<Boolean> future = executor.submit(workStop);
-            future.get(5, TimeUnit.SECONDS);
-        } catch (TimeoutException e) {
-            Log.e(TAG, "stop: 执行超时");
-        } catch (Exception e) {
-            Log.e(TAG, "stop: " + e.getMessage());
+    private void initRecord() throws Exception {
+        if (mMediaRecorder == null) {
+            mMediaRecorder = new MediaRecorder();
         }
-        Log.d(TAG, "end stop");
-    }
-
-    @Override
-    public void onClick(View v) {
-        switch (v.getId()) {
-            case R.id.btn_record:
-                Log.d(TAG, "onClick: ");
-                try {
-                    //获得外接USB输入设备的信息
-                    Process p = Runtime.getRuntime().exec("cat /proc/bus/input/devices");
-                    BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()));
-                    String line = null;
-                    while ((line = in.readLine()) != null) {
-                        String deviceInfo = line.trim();
-                        Log.d(TAG, "onClick: " + deviceInfo);
-                        //对获取的每行的设备信息进行过滤，获得自己想要的。
-                    }
-
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-                break;
-        }
-    }
-
-    @Override
-    public void onConfigurationChanged(Configuration newConfig) {
-        super.onConfigurationChanged(newConfig);
-    }
-
-    @Override
-    public void surfaceCreated(SurfaceHolder holder) {
-        Log.d(TAG, "surfaceCreated");
-    }
-
-    @Override
-    public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
-        Log.d(TAG, "surfaceChanged: format:" + format + " width:" + width + " height" + height);
-        resetRecorder();
-    }
-
-    @Override
-    public void surfaceDestroyed(SurfaceHolder holder) {
-        Log.d(TAG, "surfaceDestroyed");
-        freeCameraResource();
-    }
-
-    @Override
-    public void onError(MediaRecorder mr, int what, int extra) {
-        try {
-            Log.d(TAG, "onError");
-            if (isRecording) {
-                stopRecord();
-            }
-            if (mr != null) {
-                mr.reset();
-                resetRecorder();
-                releaseRecord();
-            }
-        } catch (IllegalStateException e) {
-            Log.e(TAG, "onError:" + e.getMessage());
-        } catch (Exception e) {
-            Log.e(TAG, "onError:" + e.getMessage());
-        }
-    }
-
-    @Nullable
-    @Override
-    public IBinder onBind(Intent intent) {
-        Log.d(TAG, "onBind");
-        return null;
-    }
-
-    private void resetRecorder() {
-        Log.d(TAG, "resetRecorder");
         if (mCamera != null) {
-            freeCameraResource();
+            mCamera.unlock();
+            mMediaRecorder.setCamera(mCamera);
         }
 
+        mMediaRecorder.setOnErrorListener(this);
+        mMediaRecorder.setAudioSource(MediaRecorder.AudioSource.DEFAULT);//音频源
+        mMediaRecorder.setVideoSource(MediaRecorder.VideoSource.CAMERA);// 视频源
+
+        CamcorderProfile mProfile = CamcorderProfile.get(CamcorderProfile.QUALITY_720P);
+        if (null == mProfile) {
+            isRecording = false;
+            return;
+        }
+
+        if (null != optimalSize) {
+            mProfile.videoFrameWidth = optimalSize.width;
+            mProfile.videoFrameHeight = optimalSize.height;
+        } else {
+            mProfile.videoFrameWidth = 640;
+            mProfile.videoFrameHeight = 360;
+        }
+        mProfile.videoFrameWidth = 480;
+        mProfile.videoFrameHeight = 320;
+        // 单独从setProfile中抽出的设置视频的参数
+        mMediaRecorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4);
+//            mMediaRecorder.setOutputFormat(mProfile.fileFormat);
+        mMediaRecorder.setVideoFrameRate(mProfile.videoFrameRate);
+        mMediaRecorder.setVideoSize(mProfile.videoFrameWidth, mProfile.videoFrameHeight);
+        mMediaRecorder.setVideoEncodingBitRate(mProfile.videoBitRate);
+//            mMediaRecorder.setVideoEncoder(mProfile.videoCodec);
+        mMediaRecorder.setVideoEncoder(MediaRecorder.VideoEncoder.H264);
+        mMediaRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC);
+//            mMediaRecorder.setVideoEncoder(mProfile.videoCodec);
+        // 设置音视频参数统一配置，此方法已经设置了上面的视频参数
+//            mMediaRecorder.setProfile(mProfile);
+        // （延时录像的采样率）该设置是为了抽取视频的某些帧，参数值在40左右接近正常速度，0-40值越小视频越快
+//            mMediaRecorder.setCaptureRate(mFpsRange.get(0)[0]);//获取最小的每一秒录制的帧数
+
+        mMediaRecorder.setOutputFile(mVecordFile.getAbsolutePath());
+        // 录像画面旋转
+//            mMediaRecorder.setOrientationHint(180);
+
+        mMediaRecorder.prepare();
+        mMediaRecorder.start();
+    }
+
+    /**
+     * 释放资源
+     */
+    private void releaseRecord() {
+        Log.d(TAG, "releaseRecord");
+        if (mMediaRecorder != null) {
+            mMediaRecorder.setPreviewDisplay(null);
+            mMediaRecorder.setOnErrorListener(null);
+            try {
+                mMediaRecorder.release();
+            } catch (IllegalStateException e) {
+                Log.e(TAG, "releaseRecord:" + e.getMessage());
+            } catch (Exception e) {
+                Log.e(TAG, "releaseRecord:" + e.getMessage());
+            }
+        }
+        mMediaRecorder = null;
+    }
+
+    /**
+     * 释放摄像头资源
+     */
+    private void freeCameraResource() {
+        Log.d(TAG, "freeCameraResource");
+        if (mCamera != null) {
+            mCamera.setPreviewCallback(null);
+            mCamera.stopPreview();
+            mCamera.lock();
+            mCamera.release();
+            mCamera = null;
+        }
+    }
+
+    /**
+     * 创建悬浮窗
+     */
+    @SuppressLint("ClickableViewAccessibility")
+    private void createFloatView() {
+        Log.d(TAG, "createFloatView");
+        wmParams = new LayoutParams();
+        //获取WindowManagerImpl.CompatModeWrapper
+        mWindowManager = (WindowManager) getApplication().getSystemService(getApplication().WINDOW_SERVICE);
+        //设置window type
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            wmParams.type = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY;
+        } else {
+            wmParams.type = WindowManager.LayoutParams.TYPE_PHONE;
+        }
+        //设置图片格式，效果为背景透明
+        wmParams.format = PixelFormat.RGBA_8888;
+//        wmParams.format = PixelFormat.RGBA_8888;
+        //设置浮动窗口不可聚焦（实现操作除浮动窗口外的其他可见窗口的操作）
+        wmParams.flags =
+//          LayoutParams.FLAG_NOT_TOUCH_MODAL |
+                LayoutParams.FLAG_NOT_FOCUSABLE;
+//          LayoutParams.FLAG_NOT_TOUCHABLE;
+
+        //调整悬浮窗显示的停靠位置为左侧置顶
+        wmParams.gravity = Gravity.LEFT | Gravity.TOP;
+
+        // 以屏幕左上角为原点，设置x、y初始值
+        wmParams.x = 0;
+        wmParams.y = 0;
+
+        // 设置悬浮窗口长宽数据
+        wmParams.width = 1;
+        wmParams.height = 1;
+
+        LayoutInflater inflater = LayoutInflater.from(getApplication());
+        //获取浮动窗口视图所在布局
+        mFloatLayout = (RelativeLayout) inflater.inflate(R.layout.video_recorder_window, null);
+        mSurfaceView = mFloatLayout.findViewById(R.id.surfaceView);
+        btn_record = mFloatLayout.findViewById(R.id.btn_record);
+        btn_record.setOnClickListener(this);
+        //添加mFloatLayout
+        mWindowManager.addView(mFloatLayout, wmParams);
+
+        mFloatLayout.measure(View.MeasureSpec.makeMeasureSpec(0,
+                View.MeasureSpec.UNSPECIFIED), View.MeasureSpec
+                .makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED));
+        //设置监听浮动窗口的触摸移动
+        mFloatLayout.setOnTouchListener(new OnTouchListener() {
+            private int x;
+            private int y;
+
+            @Override
+            public boolean onTouch(View view, MotionEvent motionEvent) {
+                switch (motionEvent.getAction()) {
+                    case MotionEvent.ACTION_DOWN:
+                        x = (int) motionEvent.getRawX();
+                        y = (int) motionEvent.getRawY();
+                        break;
+                    case MotionEvent.ACTION_MOVE:
+                        int nowX = (int) motionEvent.getRawX();
+                        int nowY = (int) motionEvent.getRawY();
+                        int movedX = nowX - x;
+                        int movedY = nowY - y;
+                        x = nowX;
+                        y = nowY;
+                        wmParams.x = wmParams.x + movedX;
+                        wmParams.y = wmParams.y + movedY;
+
+                        // 更新悬浮窗控件布局
+                        mWindowManager.updateViewLayout(mFloatLayout, wmParams);
+                        break;
+                    default:
+                        break;
+                }
+                return false;
+            }
+        });
+    }
+
+    private void initCamera() {
         try {
             mCamera = Camera.open(1);
-            if (mCamera == null)
+            if (mCamera == null) {
+                restart();
                 return;
+            }
 //            mCamera.setDisplayOrientation(180);
             mCamera.setPreviewDisplay(mSurfaceHolder);
             parameters = mCamera.getParameters();// 获得相机参数
@@ -377,73 +409,78 @@ public class VideoRecService extends Service implements View.OnClickListener
             Log.e(TAG, "resetRecorder:" + e.getMessage());
         }
     }
-
-    private void initView() {
-        mSurfaceView = (SurfaceView) mFloatLayout.findViewById(R.id.surfaceView);
-        mSurfaceHolder = mSurfaceView.getHolder();// 取得holder
-        mSurfaceHolder.removeCallback(this);
-        mSurfaceHolder.addCallback(this); // holder加入回调接口
-        mSurfaceHolder.setKeepScreenOn(true);
-        btn_record = (Button) mFloatLayout.findViewById(R.id.btn_record);
-        btn_record.setOnClickListener(this);
-    }
+    ///////////////////////////////
+    ///////////////////////////////
+    ///////////////////////////////
+    ///////////////////////////////
+    ///////////////////////////////
+    ///////////////////////////////
+    ///////////////////////////////
+    ///////////////////////////////
+    ///////////////////////////////
+    ///////////////////////////////
+    ///////////////////////////////
+    ///////////////////////////////
 
     /**
-     * 录制前，初始化
+     * 录像控制方法
+     * 整点时停止并重新开启录像（切换文件）
+     * 异常状态（摄像头断连、存储设备断连）
      */
-    private void initRecord() {
-        try {
-            if (mMediaRecorder == null) {
-                mMediaRecorder = new MediaRecorder();
-            }
-            if (mCamera != null) {
-                mCamera.unlock();
-                mMediaRecorder.setCamera(mCamera);
-            }
+    public void recorder() throws Exception {
+        Calendar cal = Calendar.getInstance();
+        int hour = cal.get(Calendar.HOUR_OF_DAY);
+        int min = cal.get(Calendar.MINUTE);
 
-            mMediaRecorder.setOnErrorListener(this);
-            mMediaRecorder.setAudioSource(MediaRecorder.AudioSource.DEFAULT);//音频源
-            mMediaRecorder.setVideoSource(MediaRecorder.VideoSource.CAMERA);// 视频源
-
-            CamcorderProfile mProfile = CamcorderProfile.get(CamcorderProfile.QUALITY_720P);
-            if (null == mProfile) {
-                isRecording = false;
+        if (0 == min % 1) {
+            // 整点切换文件
+            stopRecord();
+            if (hour > 20 || hour < 7) {
+                Log.d(TAG, "recorder: 非录像时段");
                 return;
             }
-
-            if (null != optimalSize) {
-                mProfile.videoFrameWidth = optimalSize.width;
-                mProfile.videoFrameHeight = optimalSize.height;
-            } else {
-                mProfile.videoFrameWidth = 640;
-                mProfile.videoFrameHeight = 360;
+            if (CheckInApp.getIsMaintence()) {
+                Log.d(TAG, "维护中暂不录像");
+                return;
             }
-
-            // 单独从setProfile中抽出的设置视频的参数
-            mMediaRecorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4);
-//            mMediaRecorder.setOutputFormat(mProfile.fileFormat);
-            mMediaRecorder.setVideoFrameRate(mProfile.videoFrameRate);
-            mMediaRecorder.setVideoSize(mProfile.videoFrameWidth, mProfile.videoFrameHeight);
-            mMediaRecorder.setVideoEncodingBitRate(mProfile.videoBitRate);
-//            mMediaRecorder.setVideoEncoder(mProfile.videoCodec);
-            mMediaRecorder.setVideoEncoder(MediaRecorder.VideoEncoder.H264);
-            mMediaRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC);
-//            mMediaRecorder.setVideoEncoder(mProfile.videoCodec);
-            // 设置音视频参数统一配置，此方法已经设置了上面的视频参数
-//            mMediaRecorder.setProfile(mProfile);
-            // （延时录像的采样率）该设置是为了抽取视频的某些帧，参数值在40左右接近正常速度，0-40值越小视频越快
-//            mMediaRecorder.setCaptureRate(mFpsRange.get(0)[0]);//获取最小的每一秒录制的帧数
-
-            mMediaRecorder.setOutputFile(mVecordFile.getAbsolutePath());
-            // 录像画面旋转
-//            mMediaRecorder.setOrientationHint(180);
-
-            mMediaRecorder.prepare();
-            mMediaRecorder.start();
-        } catch (Exception e) {
-            Log.e(TAG, "initRecord:" + e.getMessage());
-            releaseRecord();
+            startRecord();
         }
+    }
+
+    @Override
+    public void onClick(View v) {
+        switch (v.getId()) {
+            case R.id.btn_record:
+                Log.d(TAG, "onClick: ");
+                restart();
+                break;
+        }
+    }
+
+    @Override
+    public void onConfigurationChanged(Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+    }
+
+    @Override
+    public void onError(MediaRecorder mr, int what, int extra) {
+        restart();
+    }
+
+    @Override
+    public void surfaceCreated(SurfaceHolder holder) {
+        Log.i(TAG, "预览创建：surfaceCreated");
+        initCamera();
+    }
+
+    @Override
+    public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
+        Log.i(TAG, "预览改变：surfaceChanged: format:" + format + " width:" + width + " height" + height);
+    }
+
+    @Override
+    public void surfaceDestroyed(SurfaceHolder holder) {
+        Log.i(TAG, "预览销毁：surfaceDestroyed");
     }
 
     /**
@@ -536,40 +573,6 @@ public class VideoRecService extends Service implements View.OnClickListener
     }
 
     /**
-     * 释放资源
-     */
-    private void releaseRecord() {
-        Log.d(TAG, "releaseRecord");
-        if (mMediaRecorder != null) {
-            mMediaRecorder.setPreviewDisplay(null);
-            mMediaRecorder.setOnErrorListener(null);
-            try {
-                mMediaRecorder.release();
-            } catch (IllegalStateException e) {
-                Log.e(TAG, "releaseRecord:" + e.getMessage());
-            } catch (Exception e) {
-                Log.e(TAG, "releaseRecord:" + e.getMessage());
-            }
-        }
-        mMediaRecorder = null;
-    }
-
-    /**
-     * 释放摄像头资源
-     */
-    private void freeCameraResource() {
-        Log.d(TAG, "freeCameraResource");
-        if (mCamera != null) {
-            mCamera.setPreviewCallback(null);
-            mCamera.stopPreview();
-            mCamera.lock();
-            mCamera.release();
-            mCamera = null;
-        }
-    }
-
-
-    /**
      * 数字时间串
      *
      * @param type 类型 0 年月日型；1 时分秒型；2 年月日时分秒型
@@ -595,80 +598,34 @@ public class VideoRecService extends Service implements View.OnClickListener
         return dateString;
     }
 
-    /**
-     * 创建悬浮窗
-     */
-    @SuppressLint("ClickableViewAccessibility")
-    private void createFloatView() {
-        Log.d(TAG, "createFloatView");
-        wmParams = new LayoutParams();
-        //获取WindowManagerImpl.CompatModeWrapper
-        mWindowManager = (WindowManager) getApplication().getSystemService(getApplication().WINDOW_SERVICE);
-        //设置window type
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            wmParams.type = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY;
-        } else {
-            wmParams.type = WindowManager.LayoutParams.TYPE_PHONE;
-        }
-        //设置图片格式，效果为背景透明
-        wmParams.format = PixelFormat.RGBA_8888;
-//        wmParams.format = PixelFormat.RGBA_8888;
-        //设置浮动窗口不可聚焦（实现操作除浮动窗口外的其他可见窗口的操作）
-        wmParams.flags =
-//          LayoutParams.FLAG_NOT_TOUCH_MODAL |
-                LayoutParams.FLAG_NOT_FOCUSABLE;
-//          LayoutParams.FLAG_NOT_TOUCHABLE;
-
-        //调整悬浮窗显示的停靠位置为左侧置顶
-        wmParams.gravity = Gravity.LEFT | Gravity.TOP;
-
-        // 以屏幕左上角为原点，设置x、y初始值
-        wmParams.x = 0;
-        wmParams.y = 0;
-
-        // 设置悬浮窗口长宽数据
-        wmParams.width = 1;
-        wmParams.height = 1;
-
-        LayoutInflater inflater = LayoutInflater.from(getApplication());
-        //获取浮动窗口视图所在布局
-        mFloatLayout = (RelativeLayout) inflater.inflate(R.layout.video_recorder_window, null);
-        //添加mFloatLayout
-        mWindowManager.addView(mFloatLayout, wmParams);
-
-        mFloatLayout.measure(View.MeasureSpec.makeMeasureSpec(0,
-                View.MeasureSpec.UNSPECIFIED), View.MeasureSpec
-                .makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED));
-        //设置监听浮动窗口的触摸移动
-        mFloatLayout.setOnTouchListener(new OnTouchListener() {
-            private int x;
-            private int y;
-
-            @Override
-            public boolean onTouch(View view, MotionEvent motionEvent) {
-                switch (motionEvent.getAction()) {
-                    case MotionEvent.ACTION_DOWN:
-                        x = (int) motionEvent.getRawX();
-                        y = (int) motionEvent.getRawY();
-                        break;
-                    case MotionEvent.ACTION_MOVE:
-                        int nowX = (int) motionEvent.getRawX();
-                        int nowY = (int) motionEvent.getRawY();
-                        int movedX = nowX - x;
-                        int movedY = nowY - y;
-                        x = nowX;
-                        y = nowY;
-                        wmParams.x = wmParams.x + movedX;
-                        wmParams.y = wmParams.y + movedY;
-
-                        // 更新悬浮窗控件布局
-                        mWindowManager.updateViewLayout(mFloatLayout, wmParams);
-                        break;
-                    default:
-                        break;
-                }
-                return false;
-            }
-        });
+    @Nullable
+    @Override
+    public IBinder onBind(Intent intent) {
+        Log.d(TAG, "onBind");
+        return null;
     }
+
+    Comparator<File> dateDirComparator = (o1, o2) -> {
+        long o1Name = 0;
+        try {
+            o1Name = Long.parseLong(o1.getName().replace(".mp4", ""));
+        } catch (NumberFormatException e) {
+            Log.e(TAG, "Arrays.sort:" + e.getMessage());
+            return -1;
+        }
+        long o2Name = 0;
+        try {
+            o2Name = Long.parseLong(o2.getName().replace(".mp4", ""));
+        } catch (NumberFormatException e) {
+            Log.e(TAG, "Arrays.sort:" + e.getMessage());
+            return 1;
+        }
+        if (o1Name < o2Name) {
+            return -1;
+        } else if (o1Name == o2Name) {
+            return 0;
+        } else {
+            return 1;
+        }
+    };
 }

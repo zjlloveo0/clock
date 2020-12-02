@@ -54,6 +54,11 @@
             android:enabled="true"
             android:exported="true"
             android:process=":updater_servant" />
+        <receiver android:name="com.mrzhou5.tools.clock.receiver.ServiceReceiver" >
+            <intent-filter>
+                <action android:name="RESTART_SERVICE" />
+            </intent-filter>
+        </receiver>
         <receiver android:name="com.mrzhou5.tools.clock.receiver.BootBroadcastReceiver">
             <intent-filter android:priority="1000">
                 <action android:name="android.intent.action.BOOT_COMPLETED" />

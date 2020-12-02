@@ -18,4 +18,5 @@
         android:text="15:56:66"
         android:textSize="50sp"
         android:textColor="#fff" />
+
 </RelativeLayout>
