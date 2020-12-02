@@ -91,18 +91,18 @@ public class VideoRecService extends Service implements View.OnClickListener
     };
 
     Comparator<File> dateDirComparator = (o1, o2) -> {
-        int o1Name = 0;
+        long o1Name = 0;
         try {
-            o1Name = Integer.valueOf(o1.getName());
+            o1Name = Long.parseLong(o1.getName().replace(".mp4", ""));
         } catch (NumberFormatException e) {
-            Log.d(TAG, "Arrays.sort:" + e.getMessage());
+            Log.e(TAG, "Arrays.sort:" + e.getMessage());
             return -1;
         }
-        int o2Name = 0;
+        long o2Name = 0;
         try {
-            o2Name = Integer.valueOf(o2.getName());
+            o2Name = Long.parseLong(o2.getName().replace(".mp4", ""));
         } catch (NumberFormatException e) {
-            Log.d(TAG, "Arrays.sort:" + e.getMessage());
+            Log.e(TAG, "Arrays.sort:" + e.getMessage());
             return 1;
         }
         if (o1Name < o2Name) {
@@ -120,13 +120,13 @@ public class VideoRecService extends Service implements View.OnClickListener
             try {
                 future.get(8, TimeUnit.SECONDS);
             } catch (TimeoutException e) {
-                Log.d(TAG, "onReceive: 执行超时");
+                Log.e(TAG, "onReceive: 执行超时");
                 future.cancel(true);
 //                executor.shutdownNow();
                 freeCameraResource();
                 restartVideoRecoder(true);
             } catch (Exception e) {
-                Log.d(TAG, "stop: " + e.getMessage());
+                Log.e(TAG, "stop: " + e.getMessage());
             }
         }
     };
@@ -174,6 +174,10 @@ public class VideoRecService extends Service implements View.OnClickListener
                     Log.d(TAG, "recorder: 非录像时段");
                     return;
                 }
+                if (CheckInApp.getIsMaintence()) {
+                    Log.d(TAG, "维护中暂不录像");
+                    return;
+                }
                 startRecord();
             } else if (!isRecording) {
                 // 未启动需要启动
@@ -181,7 +185,7 @@ public class VideoRecService extends Service implements View.OnClickListener
                 startRecord();
             }
         } catch (Exception e) {
-            Log.d(TAG, "BroadcastReceiver:" + e.getMessage());
+            Log.e(TAG, "BroadcastReceiver:" + e.getMessage());
         }
     }
 
@@ -196,7 +200,7 @@ public class VideoRecService extends Service implements View.OnClickListener
                 createRecordDir();
                 initRecord();
             } catch (Exception e) {
-                Log.d(TAG, "startRecord:" + e.getMessage());
+                Log.e(TAG, "startRecord:" + e.getMessage());
             }
         }
     }
@@ -213,7 +217,7 @@ public class VideoRecService extends Service implements View.OnClickListener
                     mMediaRecorder.stop();
                     mMediaRecorder.reset();
                 } catch (Exception e) {
-                    Log.d(TAG, "stopRecord:" + e.getMessage());
+                    Log.e(TAG, "stopRecord:" + e.getMessage());
                 }
             }
         }
@@ -262,9 +266,9 @@ public class VideoRecService extends Service implements View.OnClickListener
             Future<Boolean> future = executor.submit(workStop);
             future.get(5, TimeUnit.SECONDS);
         } catch (TimeoutException e) {
-            Log.d(TAG, "stop: 执行超时");
+            Log.e(TAG, "stop: 执行超时");
         } catch (Exception e) {
-            Log.d(TAG, "stop: " + e.getMessage());
+            Log.e(TAG, "stop: " + e.getMessage());
         }
         Log.d(TAG, "end stop");
     }
@@ -327,9 +331,9 @@ public class VideoRecService extends Service implements View.OnClickListener
                 releaseRecord();
             }
         } catch (IllegalStateException e) {
-            Log.d(TAG, "onError:" + e.getMessage());
+            Log.e(TAG, "onError:" + e.getMessage());
         } catch (Exception e) {
-            Log.d(TAG, "onError:" + e.getMessage());
+            Log.e(TAG, "onError:" + e.getMessage());
         }
     }
 
@@ -370,7 +374,7 @@ public class VideoRecService extends Service implements View.OnClickListener
             mCamera.setParameters(parameters);// 设置相机参数
             mCamera.startPreview();// 开始预览
         } catch (Exception e) {
-            Log.d(TAG, "resetRecorder:" + e.getMessage());
+            Log.e(TAG, "resetRecorder:" + e.getMessage());
         }
     }
 
@@ -437,7 +441,7 @@ public class VideoRecService extends Service implements View.OnClickListener
             mMediaRecorder.prepare();
             mMediaRecorder.start();
         } catch (Exception e) {
-            Log.d(TAG, "initRecord:" + e.getMessage());
+            Log.e(TAG, "initRecord:" + e.getMessage());
             releaseRecord();
         }
     }
@@ -459,17 +463,26 @@ public class VideoRecService extends Service implements View.OnClickListener
             int fileLength = files.length;
             if (null != files && fileLength > 1) {
                 Arrays.sort(files, dateDirComparator);
+                for (int i = 0; i < fileLength - 3; i++) {
+                    FileUtil.delete(files[i].getAbsolutePath());
+                }
             }
-            for (int i = 0; i < fileLength - 3; i++) {
-                FileUtil.delete(files[i].getAbsolutePath());
-            }
+
             // 判断存储空间，不足时删除最旧日期的文件
             files = videoDirs.listFiles();
-            if (null != files && fileLength > 1) {
-                Arrays.sort(files, dateDirComparator);
-            }
-            if (null != files && 1073741824L > getDirFreeSpace(FileUtil.getVideoStorageRootPath())) {
-                FileUtil.delete(files[0].getAbsolutePath());
+            if (noneFree() && files != null && files.length > 0) {
+                if (files.length == 1) {
+                    File[] videoFiles = files[0].listFiles();
+                    if (null != videoFiles && videoFiles.length > 2) {
+                        Arrays.sort(videoFiles, dateDirComparator);
+                        for (int i = 0; noneFree() && (i < videoFiles.length - 2); i++) {
+                            FileUtil.delete(videoFiles[i].getAbsolutePath());
+                        }
+                    }
+                } else {
+                    Arrays.sort(files, dateDirComparator);
+                    FileUtil.delete(files[0].getAbsolutePath());
+                }
             }
         }
         // 新视频的目录
@@ -482,8 +495,17 @@ public class VideoRecService extends Service implements View.OnClickListener
             mVecordFile = new File(fileDir.getAbsolutePath() + "/" + getDateNumber(2) + ".mp4");
             Log.d(TAG, "FilePath:" + mVecordFile.getAbsolutePath());
         } catch (Exception e) {
-            Log.d(TAG, "createRecordFile:" + e.getMessage());
+            Log.e(TAG, "createRecordFile:" + e.getMessage());
         }
+    }
+
+    /**
+     * 空间不足
+     *
+     * @return
+     */
+    private boolean noneFree() {
+        return 1073741824L > getDirFreeSpace(FileUtil.getVideoStorageRootPath());
     }
 
     /**
@@ -497,7 +519,7 @@ public class VideoRecService extends Service implements View.OnClickListener
         try {
             stat = new StatFs(path);
         } catch (Exception e) {
-            Log.d(TAG, "Invalid path:" + e.getMessage());
+            Log.e(TAG, "Invalid path:" + e.getMessage());
             return 0;
         }
         long blockSize = 0;
@@ -524,9 +546,9 @@ public class VideoRecService extends Service implements View.OnClickListener
             try {
                 mMediaRecorder.release();
             } catch (IllegalStateException e) {
-                Log.d(TAG, "releaseRecord:" + e.getMessage());
+                Log.e(TAG, "releaseRecord:" + e.getMessage());
             } catch (Exception e) {
-                Log.d(TAG, "releaseRecord:" + e.getMessage());
+                Log.e(TAG, "releaseRecord:" + e.getMessage());
             }
         }
         mMediaRecorder = null;
