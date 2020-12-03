@@ -216,7 +216,7 @@ public class VideoRecService extends Service implements View.OnClickListener
         mMediaRecorder.setAudioSource(MediaRecorder.AudioSource.DEFAULT);//音频源
         mMediaRecorder.setVideoSource(MediaRecorder.VideoSource.CAMERA);// 视频源
 
-        CamcorderProfile mProfile = CamcorderProfile.get(CamcorderProfile.QUALITY_720P);
+        CamcorderProfile mProfile = CamcorderProfile.get(CamcorderProfile.QUALITY_LOW);
         if (null == mProfile) {
             isRecording.set(false);
             return;
@@ -229,8 +229,6 @@ public class VideoRecService extends Service implements View.OnClickListener
             mProfile.videoFrameWidth = 640;
             mProfile.videoFrameHeight = 360;
         }
-        mProfile.videoFrameWidth = 480;
-        mProfile.videoFrameHeight = 320;
         // 单独从setProfile中抽出的设置视频的参数
         mMediaRecorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4);
 //            mMediaRecorder.setOutputFormat(mProfile.fileFormat);
