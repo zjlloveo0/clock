@@ -30,6 +30,7 @@ public class FloatingService extends Service {
     private WindowManager windowManager;
     private WindowManager.LayoutParams layoutParams;
     private TextView timeStr;
+    private View view;
     private SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss");
 
     @Override
@@ -45,7 +46,7 @@ public class FloatingService extends Service {
 
     @SuppressLint("InflateParams")
     private void showFloatingWindow() {
-        MaintenceInfoActivity.atomicIsStart = true;
+        MaintenceInfoActivity.atomicIsStart.set(true);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && Settings.canDrawOverlays(this)) {
             // 获取WindowManager服务
             windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
@@ -67,7 +68,7 @@ public class FloatingService extends Service {
             layoutParams.flags = layoutParams.flags | WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON;
 
             // 新建悬浮窗控件
-            View view = LayoutInflater.from(this).inflate(R.layout.test_layout, null);
+            view = LayoutInflater.from(this).inflate(R.layout.test_layout, null);
             timeStr = view.findViewById(R.id.timeStr2);
             timeStr.setOnClickListener(v -> {
                 Log.d(TAG, "maintenceTimes: " + maintenceTimes);
@@ -153,6 +154,7 @@ public class FloatingService extends Service {
     @Override
     public void onDestroy() {
         super.onDestroy();
-        MaintenceInfoActivity.atomicIsStart = false;
+        windowManager.removeViewImmediate(view);
+        MaintenceInfoActivity.atomicIsStart.set(false);
     }
 }

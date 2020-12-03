@@ -194,6 +194,17 @@ public class CheckInApp extends Application {
         return isExisted;
     }
 
+    public static boolean isServiceRunning(String servicename,Context context){
+        ActivityManager am = (ActivityManager) context.getSystemService(Context.ACTIVITY_SERVICE);
+        List<ActivityManager.RunningServiceInfo>  infos = am.getRunningServices(100);
+        for(ActivityManager.RunningServiceInfo info: infos){
+            if(servicename.equals(info.service.getClassName())){
+                return true;
+            }
+        }
+        return false;
+    }
+
     /**
      * 打开App
      */

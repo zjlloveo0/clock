@@ -30,13 +30,14 @@ import com.mrzhou5.tools.clock.videoRecorder.VideoRecService;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class MaintenceInfoActivity extends BaseActivity {
     private final static String TAG = MaintenceInfoActivity.class.getSimpleName();
     private TextView timeStr;
-    public static boolean atomicIsStart = false;
-    public static boolean atomicIsStartVideo = false;
+    public static AtomicBoolean atomicIsStart = new AtomicBoolean(false);
+    public static AtomicBoolean atomicIsStartVideo = new AtomicBoolean(false);
     private static MaintenceInfoActivity instance = null;
     private Intent floatService;
     //创建监听权限的接口对象
@@ -66,10 +67,10 @@ public class MaintenceInfoActivity extends BaseActivity {
         timeStr = findViewById(R.id.timeStr);
         timeStr.setTypeface(CheckInApp.getOtfPingfangSimpleRoutine());
         timeStr.setOnClickListener(v -> {
-            if (!atomicIsStart) {
+            if (!atomicIsStart.get()) {
                 startService(floatService);
             }
-            if (!atomicIsStartVideo) {
+            if (!atomicIsStartVideo.get()) {
                 startVideoRecorder();
             }
         });
@@ -90,10 +91,10 @@ public class MaintenceInfoActivity extends BaseActivity {
             startActivityForResult(intent, 0);
             return;
         }
-        if (!atomicIsStart) {
+        if (!atomicIsStart.get()) {
             startService(floatService);
         }
-        if (!atomicIsStartVideo) {
+        if (!atomicIsStartVideo.get()) {
             startVideoRecorder();
         }
     }
@@ -106,10 +107,10 @@ public class MaintenceInfoActivity extends BaseActivity {
                 Toast.makeText(this, "授权失败", Toast.LENGTH_SHORT).show();
             } else {
                 Toast.makeText(this, "授权成功", Toast.LENGTH_SHORT).show();
-                if (!atomicIsStart) {
+                if (!atomicIsStart.get()) {
                     startService(floatService);
                 }
-                if (!atomicIsStartVideo) {
+                if (!atomicIsStartVideo.get()) {
                     startVideoRecorder();
                 }
             }

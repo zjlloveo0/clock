@@ -31,8 +31,8 @@ import android.widget.RelativeLayout;
 import com.mrzhou5.tools.clock.R;
 import com.mrzhou5.tools.clock.activity.MaintenceInfoActivity;
 import com.mrzhou5.tools.clock.application.CheckInApp;
-import com.mrzhou5.tools.clock.receiver.ServiceReceiver;
 import com.mrzhou5.tools.clock.util.FileUtil;
+import com.mrzhou5.tools.clock.util.MsgUtil;
 
 import java.io.File;
 import java.text.SimpleDateFormat;
@@ -46,7 +46,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * 静默录像
@@ -69,8 +69,8 @@ public class VideoRecService extends Service implements View.OnClickListener
     private Camera mCamera;
     private File mVecordFile = null;        // 录像文件
 
-    private volatile boolean isRecording = false;
-    private volatile boolean isRegister = false;
+    private volatile AtomicBoolean isRecording = new AtomicBoolean(false);
+    private volatile AtomicBoolean isRegister = new AtomicBoolean(false);
     List<int[]> mFpsRange;
     private Camera.Size optimalSize;
     private Camera.Parameters parameters;
@@ -86,20 +86,21 @@ public class VideoRecService extends Service implements View.OnClickListener
         recorder();
         return true;
     };
-    private ServiceReceiver serviceReceiver;
 
-    private BroadcastReceiver mTimeReceiver = new BroadcastReceiver() {
+    private BroadcastReceiver mReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
-            Future<Boolean> future = executor.submit(startWork);
-            boolean isException = false;
-            try {
-                future.get(8, TimeUnit.SECONDS);
-            } catch (Exception e) {
-                isException = true;
-                Log.e(TAG, "stop: " + e.getMessage());
-            } finally {
-                if (isException) {
+            if (intent.getAction().equals("RESTART_SERVICE")) {
+                Log.d(TAG, "onReceive: 停止录像服务");
+                MsgUtil.send("停止录像服务", "" + System.currentTimeMillis());
+                Intent videoIntent = new Intent(MaintenceInfoActivity.getInstance(), VideoRecService.class);
+                MaintenceInfoActivity.getInstance().stopService(videoIntent);
+            } else if (intent.getAction().equals(Intent.ACTION_TIME_TICK)) {
+                Future<Boolean> future = executor.submit(startWork);
+                try {
+                    future.get(8, TimeUnit.SECONDS);
+                } catch (Exception e) {
+                    Log.e(TAG, "stop: " + e.getMessage());
                     restart();
                 }
             }
@@ -111,11 +112,7 @@ public class VideoRecService extends Service implements View.OnClickListener
         super.onCreate();
         instance = this;
         Log.i(TAG, "onCreat");
-        MaintenceInfoActivity.atomicIsStartVideo = true;
-        serviceReceiver = new ServiceReceiver();
-        IntentFilter filter = new IntentFilter();
-        filter.addAction("RESTART_SERVICE");
-        registerReceiver(serviceReceiver, filter);
+        MaintenceInfoActivity.atomicIsStartVideo.set(true);
         // 创建悬浮窗
         createFloatView();
         initView();
@@ -131,10 +128,13 @@ public class VideoRecService extends Service implements View.OnClickListener
             } finally {
                 if (!isException) {
                     // 启动分钟监听器 整分时收到广播
-                    IntentFilter timeFilter = new IntentFilter();
-                    timeFilter.addAction(Intent.ACTION_TIME_TICK);
-                    registerReceiver(mTimeReceiver, timeFilter);
-                    isRegister = true;
+                    IntentFilter intentFilter = new IntentFilter();
+                    intentFilter.addAction(Intent.ACTION_TIME_TICK);
+                    intentFilter.addAction("RESTART_SERVICE");
+                    registerReceiver(mReceiver, intentFilter);
+                    isRegister.set(true);
+                } else {
+                    restart();
                 }
             }
         }).start();
@@ -144,9 +144,9 @@ public class VideoRecService extends Service implements View.OnClickListener
      * 开始录制视频
      */
     public void startRecord() throws Exception {
-        if (!isRecording) {
+        if (!isRecording.get()) {
             Log.d(TAG, "开始录像");
-            isRecording = true;
+            isRecording.set(true);
             createRecordDir();
             initRecord();
         }
@@ -156,8 +156,8 @@ public class VideoRecService extends Service implements View.OnClickListener
      * 停止录制
      */
     public void stopRecord() {
-        if (isRecording) {
-            isRecording = false;
+        if (isRecording.get()) {
+            isRecording.set(false);
             Log.d(TAG, "停止录像");
             mMediaRecorder.stop();
             mMediaRecorder.reset();
@@ -166,44 +166,32 @@ public class VideoRecService extends Service implements View.OnClickListener
 
     @Override
     public void onDestroy() {
-        super.onDestroy();
+        MaintenceInfoActivity.atomicIsStartVideo.set(false);
         Log.d(TAG, "onDestroy");
-//        try {
-//            Future<Boolean> future = executor.submit(workStop);
-//            future.get(1, TimeUnit.SECONDS);
-//        } catch (TimeoutException e) {
-//            Log.e(TAG, "stop: 执行超时");
-//        } catch (Exception e) {
-//            Log.e(TAG, "stop: " + e.getMessage());
-//        }
         try {
-            stopRecord();
+            if (isRegister.get()) {
+                unregisterReceiver(mReceiver);
+                isRegister.set(false);
+            }
+            try {
+                stopRecord();
+            } catch (Exception e) {
+                Log.e(TAG, "stopRecord: " + e.getMessage());
+            }
             freeCameraResource();
             releaseRecord();
-            mWindowManager.removeView(mFloatLayout);
-            if (isRegister) {
-                unregisterReceiver(mTimeReceiver);
-                unregisterReceiver(serviceReceiver);
-                isRegister = false;
-            }
         } catch (Exception e) {
             Log.e(TAG, "onDestroy: " + e.getMessage());
+        } finally {
+            mWindowManager.removeView(mFloatLayout);
+            super.onDestroy();
         }
     }
 
     private void restart() {
-        MaintenceInfoActivity.atomicIsStartVideo = false;
         Intent intent = new Intent("RESTART_SERVICE");
         sendBroadcast(intent);
     }
-
-    Callable<Boolean> workStop = () -> {
-        stopRecord();
-        freeCameraResource();
-        releaseRecord();
-        return true;
-    };
-
 
     private void initView() {
         mSurfaceHolder = mSurfaceView.getHolder();// 取得holder
@@ -230,7 +218,7 @@ public class VideoRecService extends Service implements View.OnClickListener
 
         CamcorderProfile mProfile = CamcorderProfile.get(CamcorderProfile.QUALITY_720P);
         if (null == mProfile) {
-            isRecording = false;
+            isRecording.set(false);
             return;
         }
 
@@ -381,7 +369,7 @@ public class VideoRecService extends Service implements View.OnClickListener
 
     private void initCamera() {
         try {
-            mCamera = Camera.open(1);
+            mCamera = CameraHelper.getDefaultFrontFacingCameraInstance();
             if (mCamera == null) {
                 restart();
                 return;
@@ -393,8 +381,8 @@ public class VideoRecService extends Service implements View.OnClickListener
             List<Camera.Size> mSupportedPreviewSizes = parameters.getSupportedPreviewSizes();
             List<Camera.Size> mSupportedVideoSizes = parameters.getSupportedVideoSizes();
             optimalSize = CameraHelper.getOptimalVideoSize(mSupportedVideoSizes,
-                    mSupportedPreviewSizes, 1280, 720);
-
+                    mSupportedPreviewSizes, 320, 240);
+            Log.d(TAG, "initCamera: " + optimalSize.width + "-" + optimalSize.height);
             parameters.setPreviewSize(optimalSize.width, optimalSize.height); // 设置预览图像大小
             parameters.set("orientation", "portrait");
             List<String> focusModes = parameters.getSupportedFocusModes();
@@ -409,18 +397,6 @@ public class VideoRecService extends Service implements View.OnClickListener
             Log.e(TAG, "resetRecorder:" + e.getMessage());
         }
     }
-    ///////////////////////////////
-    ///////////////////////////////
-    ///////////////////////////////
-    ///////////////////////////////
-    ///////////////////////////////
-    ///////////////////////////////
-    ///////////////////////////////
-    ///////////////////////////////
-    ///////////////////////////////
-    ///////////////////////////////
-    ///////////////////////////////
-    ///////////////////////////////
 
     /**
      * 录像控制方法

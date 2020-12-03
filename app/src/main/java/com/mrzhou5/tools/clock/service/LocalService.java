@@ -20,6 +20,7 @@ import com.mrzhou5.tools.clock.R;
 import com.mrzhou5.tools.clock.activity.BaseActivity;
 import com.mrzhou5.tools.clock.activity.MaintenceInfoActivity;
 import com.mrzhou5.tools.clock.application.CheckInApp;
+import com.mrzhou5.tools.clock.videoRecorder.VideoRecService;
 
 import java.util.List;
 
@@ -166,6 +167,10 @@ public class LocalService extends Service implements Runnable {
                 }
                 if (CheckInApp.getKeepAppFront()) {
                     toFront();
+                }
+                if(!CheckInApp.isServiceRunning(VideoRecService.class.getName(), CheckInApp.getInstance())){
+                    Log.d(TAG, "run: 录像服务未启动");
+                    MaintenceInfoActivity.getInstance().startVideoRecorder();
                 }
             }
             try {
