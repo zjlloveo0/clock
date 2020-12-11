@@ -38,7 +38,7 @@ public class CrashHandler implements Thread.UncaughtExceptionHandler {
     @Override
     public void uncaughtException(Thread thread, Throwable ex) {  //当有未处理的异常发生时执行此函数
 
-        restartActivity(RESTART_ACTIVITY , ex);
+//        restartActivity(RESTART_ACTIVITY , ex);
 
         Log.d(CrashHandler.class.getSimpleName(), StringUtil.getExceptionMessage(new Exception(ex)));
 

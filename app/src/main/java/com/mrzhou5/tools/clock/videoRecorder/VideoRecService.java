@@ -12,6 +12,7 @@ import android.hardware.Camera;
 import android.media.CamcorderProfile;
 import android.media.MediaRecorder;
 import android.os.Build;
+import android.os.Handler;
 import android.os.IBinder;
 import android.os.StatFs;
 import android.support.annotation.Nullable;
@@ -82,6 +83,8 @@ public class VideoRecService extends Service implements View.OnClickListener
         return instance;
     }
 
+    private String pathname = "";
+
     Callable<Boolean> startWork = () -> {
         recorder();
         return true;
@@ -122,6 +125,7 @@ public class VideoRecService extends Service implements View.OnClickListener
             try {
                 Thread.sleep(3000);
                 startRecord();
+                updateMicStatus();
             } catch (Exception e) {
                 isException = true;
                 Log.e(TAG, "onCreate: " + e.getMessage());
@@ -161,6 +165,14 @@ public class VideoRecService extends Service implements View.OnClickListener
             Log.d(TAG, "停止录像");
             mMediaRecorder.stop();
             mMediaRecorder.reset();
+            double db = sum / count;
+            Log.d(TAG, "最高分贝：" + max + "平均分贝：" + db);
+            sum = 0;
+            count = 0;
+            if (db < 35) {
+                FileUtil.delete(pathname);
+                pathname = "";
+            }
         }
     }
 
@@ -503,10 +515,36 @@ public class VideoRecService extends Service implements View.OnClickListener
         }
         // 创建文件
         try {
-            mVecordFile = new File(fileDir.getAbsolutePath() + "/" + getDateNumber(2) + ".mp4");
+            pathname = fileDir.getAbsolutePath() + "/" + getDateNumber(2) + ".mp4";
+            mVecordFile = new File(pathname);
             Log.d(TAG, "FilePath:" + mVecordFile.getAbsolutePath());
         } catch (Exception e) {
             Log.e(TAG, "createRecordFile:" + e.getMessage());
+        }
+    }
+
+    private final Handler mHandler = new Handler();
+    private Runnable mUpdateMicStatusTimer = () -> updateMicStatus();
+    private int BASE = 1;
+    private int SPACE = 100;// 间隔取样时间
+    private double sum = 0;
+    private int count = 0;
+    private double max = 0;
+
+    private void updateMicStatus() {
+        if (mMediaRecorder != null) {
+            double ratio = (double) mMediaRecorder.getMaxAmplitude() / BASE;
+            double db = 0;// 分贝
+            if (ratio > 1)
+                db = 20 * Math.log10(ratio);
+            if (db > 1) {
+                sum += db;
+                count++;
+                if (db > max) {
+                    max = db;
+                }
+            }
+            mHandler.postDelayed(mUpdateMicStatusTimer, SPACE);
         }
     }
 

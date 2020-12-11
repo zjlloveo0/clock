@@ -49,9 +49,9 @@ public class CheckInApp extends Application {
     private int lastDay = 0;
     private int random = 0;
     private int amHH = 7;
-    private int amMM = 45;
-    private int pmHH = 18;
-    private int pmMM = 45;
+    private int amMM = 49;
+    private int pmHH = 19;
+    private int pmMM = 11;
     /**
      * 是否需要保持APP前台显示，若值设置为true则保持前台显示，否则不保持前台显示
      * 默认保持前台显示

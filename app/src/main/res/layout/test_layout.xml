@@ -1,22 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
-<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:paddingBottom="17dp"
-    android:background="#000"
-    android:paddingStart="10dp"
-    android:paddingTop="10dp"
-    tools:ignore="RtlSymmetry">
+    android:background="#000">
 
-    <TextView
-        android:id="@+id/timeStr2"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_centerHorizontal="true"
-        android:layout_margin="10dp"
-        android:text="15:56:66"
-        android:textSize="50sp"
-        android:textColor="#fff" />
-
-</RelativeLayout>
+        <TextView
+            android:id="@+id/timeStr2"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:gravity="center"
+            android:rotation="90"
+            android:singleLine="true"
+            android:text="2020-11-11 15:56:66"
+            android:textSize="30sp"
+            android:textColor="#fff" />
+</LinearLayout>

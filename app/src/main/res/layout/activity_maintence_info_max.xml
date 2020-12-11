@@ -1,18 +1,31 @@
 <?xml version="1.0" encoding="utf-8"?>
-<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:paddingBottom="17dp"
-    android:background="#000"
-    android:paddingLeft="10dp"
-    android:paddingTop="10dp">
+    android:background="#000">
 
-    <TextView
-        android:id="@+id/timeStr"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_centerHorizontal="true"
-        android:text="******"
-        android:textSize="50sp"
-        android:textColor="#fff" />
-</RelativeLayout>
+    <LinearLayout
+        android:layout_weight="0.8"
+        android:layout_width="0dp"
+        android:layout_height="match_parent">
+
+    </LinearLayout>
+    <LinearLayout
+        android:layout_weight="0.2"
+        android:layout_width="0dp"
+        android:layout_height="match_parent">
+
+        <TextView
+            android:id="@+id/timeStr"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:ellipsize="none"
+            android:gravity="center"
+            android:rotation="90"
+            android:singleLine="true"
+            android:text="******"
+            android:textColor="#fff"
+            android:textSize="50sp" />
+    </LinearLayout>
+
+</LinearLayout>

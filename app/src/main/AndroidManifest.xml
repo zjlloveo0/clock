@@ -29,8 +29,8 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.AppCompat.Light.NoActionBar">
-        <activity android:name="com.mrzhou5.tools.clock.activity.MaintenceInfoActivity"
-            android:screenOrientation="landscape">
+        <activity android:name="com.mrzhou5.tools.clock.activity.MaintenceInfoActivity">
+<!--            android:screenOrientation="landscape">-->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
