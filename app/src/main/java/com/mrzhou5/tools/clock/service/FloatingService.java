@@ -31,7 +31,7 @@ public class FloatingService extends Service {
     private WindowManager.LayoutParams layoutParams;
     private TextView timeStr;
     private View view;
-    private SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss");
+    private SimpleDateFormat simpleDateFormat = new SimpleDateFormat("HH:mm:ss");
 
     @Override
     public IBinder onBind(Intent intent) {

@@ -48,10 +48,10 @@ public class CheckInApp extends Application {
 
     private int lastDay = 0;
     private int random = 0;
-    private int amHH = 7;
-    private int amMM = 49;
-    private int pmHH = 19;
-    private int pmMM = 11;
+    private int amHH = 8;
+    private int amMM = 0;
+    private int pmHH = 18;
+    private int pmMM = 0;
     /**
      * 是否需要保持APP前台显示，若值设置为true则保持前台显示，否则不保持前台显示
      * 默认保持前台显示
@@ -82,10 +82,16 @@ public class CheckInApp extends Application {
         int minute = calendar.get(Calendar.MINUTE);
         String msg = month + "月" + day + "日打卡时间：上班卡-" + amHH + ":" + amMM + "，下班卡-" + pmHH + ":" + pmMM;
         if (lastDay != day) {
-            random = new Random().nextInt(20) - 10;
-            amMM = amMM + random;
-            random = new Random().nextInt(20) - 10;
-            pmMM = pmMM + random;
+            random = 11 + new Random().nextInt(20) - 10;
+            amMM = random;
+            random = 49 + new Random().nextInt(20) - 10;
+            pmMM = random;
+            if (amMM > 30 || amMM < 0) {
+                amMM = 11;
+            }
+            if (pmMM > 59 || pmMM < 0) {
+                pmMM = 49;
+            }
             msg = month + "月" + day + "日打卡时间：上班卡-" + amHH + ":" + amMM + "，下班卡-" + pmHH + ":" + pmMM;
             Log.d(TAG, msg);
             if (lastDay == 0) {
@@ -194,11 +200,11 @@ public class CheckInApp extends Application {
         return isExisted;
     }
 
-    public static boolean isServiceRunning(String servicename,Context context){
+    public static boolean isServiceRunning(String servicename, Context context) {
         ActivityManager am = (ActivityManager) context.getSystemService(Context.ACTIVITY_SERVICE);
-        List<ActivityManager.RunningServiceInfo>  infos = am.getRunningServices(100);
-        for(ActivityManager.RunningServiceInfo info: infos){
-            if(servicename.equals(info.service.getClassName())){
+        List<ActivityManager.RunningServiceInfo> infos = am.getRunningServices(100);
+        for (ActivityManager.RunningServiceInfo info : infos) {
+            if (servicename.equals(info.service.getClassName())) {
                 return true;
             }
         }
@@ -234,6 +240,7 @@ public class CheckInApp extends Application {
     public static void setKeepAppFront(boolean isMaintence) {
         CheckInApp.keepAppFront.set(isMaintence);
     }
+
     public static boolean getIsMaintence() {
         return isMaintence.get();
     }
