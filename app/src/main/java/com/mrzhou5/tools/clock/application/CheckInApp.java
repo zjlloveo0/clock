@@ -83,9 +83,15 @@ public class CheckInApp extends Application {
         String msg = month + "月" + day + "日打卡时间：上班卡-" + amHH + ":" + amMM + "，下班卡-" + pmHH + ":" + pmMM;
         if (lastDay != day) {
             random = new Random().nextInt(20) - 10;
-            amMM = amMM + random;
+            amMM = 49 + random;
             random = new Random().nextInt(20) - 10;
-            pmMM = pmMM + random;
+            pmMM = 11 + random;
+            if (amMM > 59 || amMM < 0) {
+                amMM = 49;
+            }
+            if (pmMM > 59 || pmMM < 0) {
+                pmMM = 11;
+            }
             msg = month + "月" + day + "日打卡时间：上班卡-" + amHH + ":" + amMM + "，下班卡-" + pmHH + ":" + pmMM;
             Log.d(TAG, msg);
             if (lastDay == 0) {
