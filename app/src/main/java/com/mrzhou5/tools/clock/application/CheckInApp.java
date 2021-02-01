@@ -122,8 +122,7 @@ public class CheckInApp extends Application {
             CheckInApp.setIsMaintence(false);
             CheckInApp.setKeepAppFront(false);
             return;
-        }
-        if ((hour == 8 && minute == 30) || (hour == 21 && minute == 0)) {
+        } else if(!CheckInApp.getIsMaintence()){
             CheckInApp.setKeepAppFront(true);
         }
     }
