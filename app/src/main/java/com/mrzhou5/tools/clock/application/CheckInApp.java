@@ -108,12 +108,12 @@ public class CheckInApp extends Application {
             msg = month + "月" + day + "日打卡时间：上班卡-" + amHH + ":" + amMM + "，下班卡-" + pmHH + ":" + pmMM;
             Log.d(TAG, msg);
             if (lastDay == 0) {
-                MsgUtil.send(amHH + "*" + amMM + "打卡准备" + pmHH + "*" + pmMM, msg);
+                MsgUtil.send(amHH + "-" + amMM + "打卡准备" + pmHH + "-" + pmMM, msg);
             }
             lastDay = day;
         }
-        if ((hour == 7 && minute == 0) || (hour == 18 && minute == 0)) {
-            MsgUtil.send("打卡准备", msg);
+        if ((hour == 7 && minute == 0) || (hour == 18 && minute == 14)) {
+            MsgUtil.send(amHH + "-" + amMM + "打卡准备" + pmHH + "-" + pmMM, msg);
         }
         if ((hour == amHH && minute >= amMM) || (hour == pmHH && minute >= pmMM)) {
             if (CheckInApp.getKeepAppFront()) {
