@@ -65,7 +65,6 @@ public class MaintenceInfoActivity extends BaseActivity {
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         floatService = new Intent(MaintenceInfoActivity.this, FloatingService.class);
         timeStr = findViewById(R.id.timeStr);
-        timeStr.setTypeface(CheckInApp.getOtfPingfangSimpleRoutine());
         timeStr.setOnClickListener(v -> {
             if (!atomicIsStart.get()) {
                 startService(floatService);

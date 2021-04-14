@@ -30,7 +30,7 @@ import clock.service.IMyAidlInterface;
 /**
  * 本地保活服务，用于和远程服务相互保活，并保证APP始终在前端
  *
- * @author tao-tengtao
+ * @author zjl
  * @date 2018/10/31.
  */
 public class LocalService extends Service implements Runnable {

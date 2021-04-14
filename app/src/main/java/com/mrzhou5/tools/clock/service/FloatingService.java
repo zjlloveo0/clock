@@ -19,6 +19,8 @@ import android.widget.TextView;
 import com.mrzhou5.tools.clock.R;
 import com.mrzhou5.tools.clock.activity.MaintenceInfoActivity;
 import com.mrzhou5.tools.clock.application.CheckInApp;
+import com.mrzhou5.tools.clock.common.ConfigureManager;
+import com.mrzhou5.tools.clock.util.MsgUtil;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -76,21 +78,22 @@ public class FloatingService extends Service {
                     maintenceTimes.set(1);
                     CheckInApp.setIsMaintence(!CheckInApp.getIsMaintence());
                     if (CheckInApp.getIsMaintence()) {
-                        timeStr.setTextColor(Color.GREEN);
+                        MsgUtil.send("打卡器维护中", "打卡器维护中");
+                        timeStr.setTextColor(Color.BLUE);
                         timeStr.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18);
                         layoutParams.width = WindowManager.LayoutParams.WRAP_CONTENT;
                         layoutParams.height = WindowManager.LayoutParams.WRAP_CONTENT;
                         windowManager.removeViewImmediate(view);
                         windowManager.addView(view, layoutParams);
-                        CheckInApp.setIsMaintence(true);
                     } else {
+                        MsgUtil.send("打卡器已取消维护", "打卡器已取消维护");
+                        ConfigureManager.getInstance().reloadProperties();
                         timeStr.setTextColor(Color.WHITE);
                         timeStr.setTextSize(TypedValue.COMPLEX_UNIT_SP, 50);
                         layoutParams.width = WindowManager.LayoutParams.MATCH_PARENT;
                         layoutParams.height = WindowManager.LayoutParams.MATCH_PARENT;
                         windowManager.removeViewImmediate(view);
                         windowManager.addView(view, layoutParams);
-                        CheckInApp.setIsMaintence(false);
                     }
                 }
             });

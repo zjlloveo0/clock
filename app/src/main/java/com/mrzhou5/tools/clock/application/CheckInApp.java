@@ -1,6 +1,5 @@
 package com.mrzhou5.tools.clock.application;
 
-import android.annotation.SuppressLint;
 import android.app.ActivityManager;
 import android.app.Application;
 import android.content.BroadcastReceiver;
@@ -9,49 +8,34 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
-import android.graphics.Color;
-import android.graphics.PixelFormat;
-import android.graphics.Typeface;
-import android.net.Uri;
 import android.os.Build;
 import android.os.Process;
-import android.provider.Settings;
 import android.util.Log;
-import android.view.Gravity;
-import android.view.LayoutInflater;
-import android.view.WindowManager;
-import android.widget.RelativeLayout;
-import android.widget.TextView;
-import android.widget.Toast;
 
-import com.mrzhou5.tools.clock.R;
+import com.mrzhou5.tools.clock.common.ConfigureManager;
 import com.mrzhou5.tools.clock.common.Constant;
 import com.mrzhou5.tools.clock.common.CrashHandler;
 import com.mrzhou5.tools.clock.service.LocalService;
 import com.mrzhou5.tools.clock.util.AdsysUtil;
 import com.mrzhou5.tools.clock.util.MsgUtil;
 import com.mrzhou5.tools.clock.util.StringUtil;
-import com.mrzhou5.tools.clock.videoRecorder.VideoRecService;
 
-import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 
 public class CheckInApp extends Application {
     private static final String TAG = CheckInApp.class.getSimpleName();
     private static CheckInApp instance = null;
-    private static Typeface OTF_PINGFANG_SIMPLE_ROUTINE = null;         //苹方-简 常规体
 
     private int lastDay = 0;
     private int random = 0;
-    private int amHH = 7;
-    private int amMM = 49;
-    private int pmHH = 18;
-    private int pmMM = 49;
+    private int amHH;
+    private int amMM;
+    private int pmHH;
+    private int pmMM;
     /**
      * 是否需要保持APP前台显示，若值设置为true则保持前台显示，否则不保持前台显示
      * 默认保持前台显示
@@ -75,6 +59,7 @@ public class CheckInApp extends Application {
     };
 
     public void daka() {
+        ConfigureManager config = ConfigureManager.getInstance();
         Calendar calendar = Calendar.getInstance();
         int month = calendar.get(Calendar.MONTH) + 1;
         int day = calendar.get(Calendar.DAY_OF_MONTH);
@@ -82,28 +67,37 @@ public class CheckInApp extends Application {
         int minute = calendar.get(Calendar.MINUTE);
         String msg = month + "月" + day + "日打卡时间：上班卡-" + amHH + ":" + amMM + "，下班卡-" + pmHH + ":" + pmMM;
         if (lastDay != day) {
-            random = new Random().nextInt(20) - 10;
-            amMM = 49 + random;
-            if (Math.abs(random) % 3 == 0) {
-                amHH = 7;
-                amMM = 49 + random;
+            random = new Random().nextInt(20) - config.getLimit();
+            int startM = config.getStartM() + random;
+            if (startM > 59) {
+                amHH = config.getStartH() + 1;
+                amMM = startM - 60;
+            } else if (startM < 0) {
+                amHH = config.getStartH() - 1;
+                amMM = startM + 60;
             } else {
-                amHH = 8;
-                amMM = 11 + random;
+                amHH = config.getStartH();
+                amMM = startM;
             }
-            random = new Random().nextInt(20) - 10;
-            if (Math.abs(random) % 3 == 0) {
-                pmHH = 19;
-                pmMM = 11 + random;
+            random = new Random().nextInt(20) - config.getLimit();
+            int endM = config.getEndM() + random;
+            if (endM > 59) {
+                pmHH = config.getEndH() + 1;
+                pmMM = endM - 60;
+            } else if (endM < 0) {
+                pmHH = config.getStartH() - 1;
+                pmMM = endM + 60;
             } else {
-                pmHH = 18;
-                pmMM = 49 + random;
+                pmHH = config.getEndH();
+                pmMM = endM;
             }
             if (amMM > 59 || amMM < 0) {
-                amMM = 49;
+                amHH = config.getStartH();
+                amMM = config.getStartM();
             }
             if (pmMM > 59 || pmMM < 0) {
-                pmMM = 49;
+                pmHH = config.getEndH();
+                pmMM = config.getEndM();
             }
             msg = month + "月" + day + "日打卡时间：上班卡-" + amHH + ":" + amMM + "，下班卡-" + pmHH + ":" + pmMM;
             Log.d(TAG, msg);
@@ -112,17 +106,17 @@ public class CheckInApp extends Application {
             }
             lastDay = day;
         }
-        if ((hour == 7 && minute == 0) || (hour == 18 && minute == 14)) {
+        if ((hour == 7 && minute == 0) || (hour == 17 && minute == 30)) {
             MsgUtil.send(amHH + "-" + amMM + "打卡准备" + pmHH + "-" + pmMM, msg);
         }
         if ((hour == amHH && minute >= amMM) || (hour == pmHH && minute >= pmMM)) {
             if (CheckInApp.getKeepAppFront()) {
                 MsgUtil.send("开始打卡:" + hour + "-" + minute, "");
             }
-            CheckInApp.setIsMaintence(false);
             CheckInApp.setKeepAppFront(false);
             return;
-        } else if(!CheckInApp.getIsMaintence()){
+        }
+        if (!CheckInApp.getIsMaintence()&&(hour <= 9 || hour >= 20)) {
             CheckInApp.setKeepAppFront(true);
         }
     }
@@ -151,9 +145,7 @@ public class CheckInApp extends Application {
             Log.d(CheckInApp.class.getSimpleName(), "守护线程!!!");
         } else {
             Log.d(CheckInApp.class.getSimpleName(), "主线程!!!");
-            if (null == OTF_PINGFANG_SIMPLE_ROUTINE) {
-                OTF_PINGFANG_SIMPLE_ROUTINE = Typeface.createFromAsset(getAssets(), "fonts/Pingfang_jian_changguiti.ttf");
-            }
+            ConfigureManager config = ConfigureManager.getInstance();
             IntentFilter filter = new IntentFilter();
             filter.addAction(Intent.ACTION_TIME_TICK);
             registerReceiver(reciver, filter);
@@ -229,6 +221,7 @@ public class CheckInApp extends Application {
     public static void openScApp() {
         Intent intent = CheckInApp.getInstance().getPackageManager().getLaunchIntentForPackage(Constant.PACK_NAME);
         if (intent != null) {
+            MsgUtil.send("打开APP", Constant.PACK_NAME);
             CheckInApp.getInstance().startActivity(intent);
         }
     }
@@ -237,6 +230,7 @@ public class CheckInApp extends Application {
      * 关闭App
      */
     public static void closeScApp() {
+//        MsgUtil.send("关闭APP", Constant.PACK_NAME);
         ActivityManager am = (ActivityManager) CheckInApp.getInstance().getSystemService(Context.ACTIVITY_SERVICE);
         am.killBackgroundProcesses(Constant.PACK_NAME);
     }
@@ -259,9 +253,5 @@ public class CheckInApp extends Application {
 
     public static void setIsMaintence(boolean isMaintence) {
         CheckInApp.isMaintence.set(isMaintence);
-    }
-
-    public static Typeface getOtfPingfangSimpleRoutine() {
-        return OTF_PINGFANG_SIMPLE_ROUTINE;
     }
 }

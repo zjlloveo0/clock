@@ -9,7 +9,7 @@ import com.mrzhou5.tools.clock.activity.BaseActivity;
 import com.mrzhou5.tools.clock.activity.MaintenceInfoActivity;
 
 /**
- * @author tao-tengtao
+ * @author zjl
  * @date 2018/10/29.
  */
 public class BootBroadcastReceiver extends BroadcastReceiver {

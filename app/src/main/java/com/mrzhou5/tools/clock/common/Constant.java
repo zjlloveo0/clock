@@ -5,4 +5,5 @@ public class Constant {
      * App包名
      */
     public static final String PACK_NAME = "com.alibaba.android.rimet";
+    public static final String DIR_NAME = "clock";
 }

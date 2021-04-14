@@ -22,7 +22,7 @@ import clock.service.IMyAidlInterface;
 /**
  * 远程保活服务，用于和LocalService相互监视保活
  *
- * @author tao-tengtao
+ * @author zjl
  * @date 2018/10/31.
  */
 public class RemoteServantService extends Service {

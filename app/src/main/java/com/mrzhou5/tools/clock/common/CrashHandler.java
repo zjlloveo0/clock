@@ -13,7 +13,7 @@ import com.mrzhou5.tools.clock.util.StringUtil;
 public class CrashHandler implements Thread.UncaughtExceptionHandler {
 
     //重新启动应用程序指定Activity间隔时间(毫秒)
-    private final static long SLEEPTIME_RESTART_ACTIVITY = 2000;
+    private final static long SLEEPTIME_RESTART_ACTIVITY = 10000;
 
     private static CrashHandler instance;
     private final static Class<MaintenceInfoActivity> RESTART_ACTIVITY = MaintenceInfoActivity.class;
@@ -38,7 +38,7 @@ public class CrashHandler implements Thread.UncaughtExceptionHandler {
     @Override
     public void uncaughtException(Thread thread, Throwable ex) {  //当有未处理的异常发生时执行此函数
 
-//        restartActivity(RESTART_ACTIVITY , ex);
+        restartActivity(RESTART_ACTIVITY , ex);
 
         Log.d(CrashHandler.class.getSimpleName(), StringUtil.getExceptionMessage(new Exception(ex)));
 

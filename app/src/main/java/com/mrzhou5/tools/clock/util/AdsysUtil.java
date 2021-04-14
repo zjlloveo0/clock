@@ -8,7 +8,7 @@ import android.os.PowerManager;
 import java.util.List;
 
 /**
- * @author tao-tengtao
+ * @author zjl
  * @date 2018/11/12.
  */
 public class AdsysUtil {
